@@ -669,7 +669,62 @@ header {
 
 /* Responsive adjustments */
 @media(max-width: 600px) {
+    body {
+        padding: 20px 10px;
+    }
+    
+    .logo-text {
+        font-size: 1.8rem;
+        letter-spacing: 3px;
+    }
+    
+    .glass-card {
+        padding: 20px 15px;
+        border-radius: 16px;
+    }
+    
+    .tab-btn {
+        font-size: 0.82rem;
+        padding: 10px 6px;
+        gap: 4px;
+    }
+    
+    .phrase-text {
+        font-size: 1.15rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .phrase-input {
+        font-size: 1.05rem;
+        padding: 10px 12px;
+    }
+    
     .telemetry-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .telemetry-stat {
+        padding: 8px;
+    }
+    
+    .stat-val {
+        font-size: 0.85rem;
+    }
+
+    .toast-container {
+        right: 12px;
+        left: 12px;
+        bottom: 12px;
+    }
+
+    .toast {
+        min-width: 0;
+        width: 100%;
+        transform: translateY(120%);
+    }
+
+    .toast.show {
+        transform: translateY(0);
     }
 }
