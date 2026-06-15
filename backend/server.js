@@ -9,8 +9,28 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Path to data file
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const PROFILE_FILE = path.join(DATA_DIR, 'user_profile.json');
+
+// Auto-seed profile if the PROFILE_FILE does not exist in DATA_DIR, 
+// but we have a default profile template in the codebase.
+function seedProfileIfMissing() {
+    const defaultProfilePath = path.join(__dirname, '..', 'data', 'user_profile.json');
+    if (!fs.existsSync(PROFILE_FILE)) {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        if (fs.existsSync(defaultProfilePath) && path.resolve(defaultProfilePath) !== path.resolve(PROFILE_FILE)) {
+            try {
+                fs.copyFileSync(defaultProfilePath, PROFILE_FILE);
+                console.log(`[SERVER] Seeded default user profile DB to: ${PROFILE_FILE}`);
+            } catch (err) {
+                console.error("[SERVER] Failed to seed default user profile DB:", err);
+            }
+        }
+    }
+}
+seedProfileIfMissing();
 
 // Helper functions for reading/writing profile JSON db
 function loadProfileDB() {
