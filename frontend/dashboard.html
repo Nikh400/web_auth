@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic | Secure Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .success-icon {
+            font-size: 4.5rem;
+            color: var(--neon-green);
+            filter: drop-shadow(0 0 20px rgba(57, 255, 20, 0.4));
+            margin-bottom: 24px;
+            animation: pulseSuccess 2s infinite alternate;
+        }
+        
+        @keyframes pulseSuccess {
+            0% { transform: scale(1); opacity: 0.9; }
+            100% { transform: scale(1.05); opacity: 1; }
+        }
+        
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .dashboard-header h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--neon-green) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        
+        .dashboard-header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+        
+        .dashboard-item {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .dashboard-item:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.35);
+        }
+        
+        .item-icon {
+            font-size: 1.8rem;
+            margin-bottom: 12px;
+        }
+        
+        .item-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        
+        .item-value {
+            font-family: var(--font-sans);
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-logout {
+            width: 100%;
+            background: linear-gradient(135deg, var(--neon-red) 0%, var(--accent-purple) 100%);
+            border: none;
+            outline: none;
+            color: white;
+            font-family: var(--font-sans);
+            font-size: 1.05rem;
+            font-weight: 600;
+            padding: 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            transition: var(--transition);
+            box-shadow: 0 10px 20px rgba(255, 56, 56, 0.2);
+        }
+        
+        .btn-logout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(255, 56, 56, 0.35);
+            opacity: 0.95;
+        }
+        
+        @media(max-width: 600px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .dashboard-header h2 {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-decor">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-fingerprint logo-icon"></i>
+                <span class="logo-text">KINETIC</span>
+                <span class="logo-sub">KEYSTROKE BIOMETRICS</span>
+            </div>
+        </header>
+
+        <!-- Main Card -->
+        <main class="glass-card" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <i class="fa-solid fa-circle-check success-icon"></i>
+            
+            <div class="dashboard-header">
+                <h2>Access Granted</h2>
+                <p>Your unique typing signature has been verified successfully.</p>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-item">
+                    <i class="fa-solid fa-shield-halved item-icon" style="color: var(--neon-green); filter: drop-shadow(0 0 8px rgba(57, 255, 20, 0.3));"></i>
+                    <div class="item-title">Security Status</div>
+                    <div class="item-value" style="color: var(--neon-green);">AUTHENTICATED</div>
+                </div>
+                <div class="dashboard-item">
+                    <i class="fa-solid fa-gauge-high item-icon" style="color: var(--accent-cyan); filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.3));"></i>
+                    <div class="item-title">Timing Profile</div>
+                    <div class="item-value" style="color: var(--accent-cyan);">OPTIMAL RHYTHM</div>
+                </div>
+            </div>
+
+            <button class="btn-logout" onclick="logout()">
+                <i class="fa-solid fa-sign-out-alt"></i> Lock & Log Out
+            </button>
+        </main>
+    </div>
+
+    <script>
+        function logout() {
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>

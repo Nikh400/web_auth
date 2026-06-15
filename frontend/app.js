@@ -306,6 +306,11 @@ async function processAuthenticationAttempt(inputElement) {
                 
                 authStatus.innerHTML = `<span style="color: var(--neon-green); font-weight: bold;">Access Granted!</span> Match Confidence: ${data.score}% (Z-Score: ${data.avgZ})`;
                 showToast(`Identity verified successfully (${data.score}% similarity)!`, "success");
+
+                // Redirect to the secure dashboard page after a short visual delay
+                setTimeout(() => {
+                    window.location.href = "dashboard.html";
+                }, 1500);
             } else {
                 // Locked Visual shake
                 lockVisual.classList.add("locked");
