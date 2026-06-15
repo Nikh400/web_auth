@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Path to data file
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp' : path.join(__dirname, '..', 'data'));
 const PROFILE_FILE = path.join(DATA_DIR, 'user_profile.json');
 
 // Auto-seed profile if the PROFILE_FILE does not exist in DATA_DIR, 
@@ -145,9 +145,14 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`========================================================`);
-    console.log(`🚀 Keystroke Biometrics server running at http://localhost:${PORT}`);
-    console.log(`========================================================`);
-});
+// Start Server (only if not running on Vercel serverless environment)
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`========================================================`);
+        console.log(`🚀 Keystroke Biometrics server running at http://localhost:${PORT}`);
+        console.log(`========================================================`);
+    });
+}
+
+// Export the Express app for Vercel Serverless
+module.exports = app;
