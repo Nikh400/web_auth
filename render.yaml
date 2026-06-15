@@ -1,15 +1,10 @@
 services:
   - type: web
     name: behavioral-biometrics
+    plan: free
     runtime: node
     buildCommand: npm install
     startCommand: node backend/server.js
     envVars:
-      - key: DATA_DIR
-        value: /var/lib/data
       - key: PORT
         value: 10000
-    disk:
-      name: biometrics-data
-      mountPath: /var/lib/data
-      sizeGB: 1
