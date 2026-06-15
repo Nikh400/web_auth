@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic | Keystroke Biometrics</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-decor">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-fingerprint logo-icon"></i>
+                <span class="logo-text">KINETIC</span>
+                <span class="logo-sub">KEYSTROKE BIOMETRICS</span>
+            </div>
+        </header>
+
+        <!-- Main Card -->
+        <main class="glass-card">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-register" onclick="switchTab('register')">
+                    <i class="fa-solid fa-user-plus"></i> Register Profile
+                </button>
+                <button class="tab-btn" id="tab-auth" onclick="switchTab('auth')">
+                    <i class="fa-solid fa-shield-halved"></i> Authenticate
+                </button>
+            </div>
+
+            <!-- Username Box -->
+            <div class="input-group">
+                <label for="username"><i class="fa-solid fa-user"></i> Username</label>
+                <input type="text" id="username" placeholder="Enter user identification..." autocomplete="off">
+            </div>
+
+            <!-- Panel Container -->
+            <div class="panel-container">
+                <!-- Registration Panel -->
+                <div class="panel active" id="panel-register">
+                    <div class="panel-header">
+                        <h2>Biometric Enrollment</h2>
+                        <p>Type the target phrase exactly 5 times to register your unique typing rhythm.</p>
+                    </div>
+
+                    <!-- Steps Dots -->
+                    <div class="steps-container">
+                        <span class="step-dot" id="dot-0">1</span>
+                        <span class="step-dot" id="dot-1">2</span>
+                        <span class="step-dot" id="dot-2">3</span>
+                        <span class="step-dot" id="dot-3">4</span>
+                        <span class="step-dot" id="dot-4">5</span>
+                    </div>
+
+                    <!-- Instruction Card -->
+                    <div class="phrase-card">
+                        <div class="phrase-label">TARGET PHRASE</div>
+                        <div class="phrase-text" id="reg-target-phrase">biometric verification</div>
+                        <div class="phrase-input-container">
+                            <input type="text" class="phrase-input" id="reg-input" placeholder="Type target phrase here..." autocomplete="off" disabled>
+                        </div>
+                    </div>
+
+                    <div class="status-msg" id="reg-status">Enter your username above to unlock the input box.</div>
+                </div>
+
+                <!-- Authentication Panel -->
+                <div class="panel" id="panel-auth">
+                    <div class="panel-header">
+                        <h2>Identity Verification</h2>
+                        <p>Type the target phrase in your natural rhythm to authenticate.</p>
+                    </div>
+
+                    <div class="auth-state">
+                        <div class="lock-visual locked" id="lock-visual">
+                            <div class="lock-ring"></div>
+                            <div class="lock-icon-wrapper">
+                                <i class="fa-solid fa-lock" id="lock-icon"></i>
+                            </div>
+                            <div class="lock-label" id="lock-label">LOCKED</div>
+                        </div>
+                    </div>
+
+                    <!-- Instruction Card -->
+                    <div class="phrase-card">
+                        <div class="phrase-label">TARGET PHRASE</div>
+                        <div class="phrase-text" id="auth-target-phrase">biometric verification</div>
+                        <div class="phrase-input-container">
+                            <input type="text" class="phrase-input" id="auth-input" placeholder="Type target phrase here to unlock..." autocomplete="off" disabled>
+                        </div>
+                    </div>
+
+                    <div class="status-msg" id="auth-status">Enter your username above to unlock the input box.</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Visualization Console (Telemetry Analysis) -->
+        <section class="glass-card console-card">
+            <div class="console-header">
+                <h3><i class="fa-solid fa-chart-line"></i> Real-time Telemetry Analysis</h3>
+                <span class="pulse-indicator"></span>
+            </div>
+            <div class="console-body">
+                <div class="telemetry-grid">
+                    <div class="telemetry-stat">
+                        <div class="stat-label">Characters Tracked</div>
+                        <div class="stat-val" id="telemetry-chars">0 / 22</div>
+                    </div>
+                    <div class="telemetry-stat">
+                        <div class="stat-label">Last Hold Time</div>
+                        <div class="stat-val" id="telemetry-hold">-- ms</div>
+                    </div>
+                    <div class="telemetry-stat">
+                        <div class="stat-label">Last Flight Time</div>
+                        <div class="stat-val" id="telemetry-flight">-- ms</div>
+                    </div>
+                    <div class="telemetry-stat">
+                        <div class="stat-label">WPM Est.</div>
+                        <div class="stat-val" id="telemetry-wpm">--</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-y-axis">
+                        <span>300ms</span>
+                        <span>150ms</span>
+                        <span>0ms</span>
+                    </div>
+                    <div class="chart-bars" id="chart-bars">
+                        <!-- Bars dynamically added by JS -->
+                        <div class="chart-placeholder">Type to visualize hold times in real time</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

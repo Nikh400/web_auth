@@ -1,0 +1,12 @@
+{
+  "name": "behavioral-biometrics-keystroke",
+  "version": "1.0.0",
+  "description": "Web-based Keystroke Dynamics Behavioral Biometrics Authentication",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
