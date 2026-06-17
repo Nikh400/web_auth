@@ -2,132 +2,65 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-let sqlite3;
-let useSQLite = true;
+let mongoose;
+let useMongoDB = false;
 
-try {
-    sqlite3 = require('sqlite3').verbose();
-} catch (err) {
-    console.warn('[DB] sqlite3 module could not be loaded. Falling back to JSON-based storage for Serverless compatibility:', err.message);
-    useSQLite = false;
+if (process.env.MONGODB_URI) {
+    try {
+        mongoose = require('mongoose');
+        useMongoDB = true;
+    } catch (err) {
+        console.warn('[DB] mongoose module could not be loaded, falling back to JSON storage:', err.message);
+        useMongoDB = false;
+    }
 }
 
 const DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp' : path.join(__dirname, '..', 'data'));
-const DB_FILE = path.join(DATA_DIR, 'users.db');
 const JSON_DB_FILE = path.join(DATA_DIR, 'users_db.json');
 
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// ----------------- SQLITE DATABASE INITIALIZATION -----------------
-let db;
-if (useSQLite) {
-    db = new sqlite3.Database(DB_FILE, (err) => {
-        if (err) {
-            console.error('[DB] Failed to connect to SQLite database:', err);
-            console.warn('[DB] Falling back to JSON-based storage.');
-            useSQLite = false;
-            initializeJSONDatabase();
-        } else {
-            console.log(`[DB] Connected to SQLite database at: ${DB_FILE}`);
-            initializeDatabase();
-        }
-    });
-} else {
-    initializeJSONDatabase();
-}
+// ----------------- MONGODB CONFIGURATION & SCHEMAS -----------------
+let User;
+let isConnected = false;
 
-// Wrap DB methods in Promises for async/await support
-const dbRun = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        if (!useSQLite) {
-            reject(new Error("SQLite is not active."));
-            return;
-        }
-        db.run(query, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-};
-
-const dbGet = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        if (!useSQLite) {
-            reject(new Error("SQLite is not active."));
-            return;
-        }
-        db.get(query, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-};
-
-async function initializeDatabase() {
+async function ensureConnection() {
+    if (!useMongoDB) return;
+    if (isConnected) return;
     try {
-        await dbRun(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                password_salt TEXT NOT NULL,
-                biometric_profile TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('[DB] SQLite users table ready.');
-        await migrateExistingJSONData();
+        const dbConn = await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000
+        });
+        isConnected = dbConn.connections[0].readyState === 1;
+        console.log('[DB] Connected successfully to MongoDB Atlas');
     } catch (err) {
-        console.error('[DB] Error initializing database schema:', err);
-    }
-}
-
-async function migrateExistingJSONData() {
-    const jsonPath = path.join(DATA_DIR, 'user_profile.json');
-    if (fs.existsSync(jsonPath)) {
-        try {
-            const raw = fs.readFileSync(jsonPath, 'utf8');
-            const data = JSON.parse(raw);
-            let migratedCount = 0;
-
-            for (const username of Object.keys(data)) {
-                const normalizedUser = username.toLowerCase();
-                const existing = await getUserByUsername(normalizedUser);
-                if (!existing) {
-                    const profile = data[username];
-                    // Generate a strong random password for migrated users
-                    const dummyPassword = crypto.randomBytes(32).toString('hex');
-                    const { salt, hash } = hashPassword(dummyPassword);
-
-                    await dbRun(`
-                        INSERT INTO users (username, name, email, password_hash, password_salt, biometric_profile)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    `, [
-                        normalizedUser,
-                        username.charAt(0).toUpperCase() + username.slice(1),
-                        `${normalizedUser}@migrated.local`,
-                        hash,
-                        salt,
-                        JSON.stringify(profile)
-                    ]);
-                    migratedCount++;
-                }
-            }
-            if (migratedCount > 0) {
-                console.log(`[DB] Successfully migrated ${migratedCount} user(s) from legacy JSON file.`);
-            }
-        } catch (e) {
-            console.error('[DB] Error during legacy JSON migration:', e);
-        }
+        console.error('[DB] MongoDB Atlas connection error:', err);
+        // Fallback to JSON if connection fails
+        useMongoDB = false;
+        initializeJSONDatabase();
     }
 }
 
 // ----------------- JSON DATABASE INITIALIZATION & OPERATIONS -----------------
 let jsonUsers = {};
+
+if (useMongoDB) {
+    const userSchema = new mongoose.Schema({
+        username: { type: String, unique: true, required: true, lowercase: true },
+        name: { type: String, required: true },
+        email: { type: String, unique: true, required: true, lowercase: true },
+        password_hash: { type: String, required: true },
+        password_salt: { type: String, required: true },
+        biometric_profile: { type: mongoose.Schema.Types.Mixed, default: null },
+        created_at: { type: Date, default: Date.now }
+    });
+
+    User = mongoose.models.User || mongoose.model('User', userSchema);
+} else {
+    initializeJSONDatabase();
+}
 
 function initializeJSONDatabase() {
     console.log(`[DB] Initializing JSON database at: ${JSON_DB_FILE}`);
@@ -208,71 +141,85 @@ function verifyPassword(password, salt, hash) {
     return hash === checkHash;
 }
 
-function parseUserProfile(user) {
-    if (!user) return null;
-    if (user.biometric_profile) {
-        try {
-            user.biometric_profile = JSON.parse(user.biometric_profile);
-        } catch (e) {
-            console.error('[DB] Error parsing biometric profile JSON:', e);
-        }
-    }
-    return user;
-}
-
 // ----------------- DB INTERFACE EXPORTS -----------------
 async function getUserByUsername(username) {
     if (!username) return null;
     const normalizedUser = username.toLowerCase();
     
-    if (useSQLite) {
-        const user = await dbGet('SELECT * FROM users WHERE username = ?', [normalizedUser]);
-        return parseUserProfile(user);
-    } else {
-        const user = jsonUsers[normalizedUser];
-        if (!user) return null;
-        return JSON.parse(JSON.stringify(user));
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                const user = await User.findOne({ username: normalizedUser }).lean();
+                return user;
+            }
+        } catch (err) {
+            console.error('[DB] Error fetching user by username from MongoDB:', err);
+        }
     }
+
+    const user = jsonUsers[normalizedUser];
+    if (!user) return null;
+    return JSON.parse(JSON.stringify(user));
 }
 
 async function getUserByEmail(email) {
     if (!email) return null;
     const normalizedEmail = email.toLowerCase();
     
-    if (useSQLite) {
-        const user = await dbGet('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
-        return parseUserProfile(user);
-    } else {
-        for (const username of Object.keys(jsonUsers)) {
-            const user = jsonUsers[username];
-            if (user.email.toLowerCase() === normalizedEmail) {
-                return JSON.parse(JSON.stringify(user));
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                const user = await User.findOne({ email: normalizedEmail }).lean();
+                return user;
             }
+        } catch (err) {
+            console.error('[DB] Error fetching user by email from MongoDB:', err);
         }
-        return null;
     }
+
+    for (const username of Object.keys(jsonUsers)) {
+        const user = jsonUsers[username];
+        if (user.email.toLowerCase() === normalizedEmail) {
+            return JSON.parse(JSON.stringify(user));
+        }
+    }
+    return null;
 }
 
 async function getUserByUsernameOrEmail(identifier) {
     if (!identifier) return null;
     const cleanId = identifier.toLowerCase();
     
-    if (useSQLite) {
-        const user = await dbGet('SELECT * FROM users WHERE username = ? OR email = ?', [cleanId, cleanId]);
-        return parseUserProfile(user);
-    } else {
-        const byUsername = jsonUsers[cleanId];
-        if (byUsername) {
-            return JSON.parse(JSON.stringify(byUsername));
-        }
-        for (const username of Object.keys(jsonUsers)) {
-            const user = jsonUsers[username];
-            if (user.email.toLowerCase() === cleanId) {
-                return JSON.parse(JSON.stringify(user));
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                const user = await User.findOne({
+                    $or: [
+                        { username: cleanId },
+                        { email: cleanId }
+                    ]
+                }).lean();
+                return user;
             }
+        } catch (err) {
+            console.error('[DB] Error fetching user by username/email from MongoDB:', err);
         }
-        return null;
     }
+
+    const byUsername = jsonUsers[cleanId];
+    if (byUsername) {
+        return JSON.parse(JSON.stringify(byUsername));
+    }
+    for (const username of Object.keys(jsonUsers)) {
+        const user = jsonUsers[username];
+        if (user.email.toLowerCase() === cleanId) {
+            return JSON.parse(JSON.stringify(user));
+        }
+    }
+    return null;
 }
 
 async function registerUser({ username, name, email, password, biometricProfile }) {
@@ -280,31 +227,37 @@ async function registerUser({ username, name, email, password, biometricProfile 
     const normalizedUser = username.toLowerCase();
     const normalizedEmail = email.toLowerCase();
 
-    if (useSQLite) {
-        await dbRun(`
-            INSERT INTO users (username, name, email, password_hash, password_salt, biometric_profile)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `, [
-            normalizedUser,
-            name,
-            normalizedEmail,
-            hash,
-            salt,
-            biometricProfile ? JSON.stringify(biometricProfile) : null
-        ]);
-        return await getUserByUsername(normalizedUser);
-    } else {
-        jsonUsers[normalizedUser] = {
-            username: normalizedUser,
-            name: name,
-            email: normalizedEmail,
-            password_hash: hash,
-            password_salt: salt,
-            biometric_profile: biometricProfile || null
-        };
-        saveJSONDatabase();
-        return JSON.parse(JSON.stringify(jsonUsers[normalizedUser]));
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                const newUser = new User({
+                    username: normalizedUser,
+                    name: name,
+                    email: normalizedEmail,
+                    password_hash: hash,
+                    password_salt: salt,
+                    biometric_profile: biometricProfile || null
+                });
+                await newUser.save();
+                return await getUserByUsername(normalizedUser);
+            }
+        } catch (err) {
+            console.error('[DB] Error registering user in MongoDB:', err);
+            throw err;
+        }
     }
+
+    jsonUsers[normalizedUser] = {
+        username: normalizedUser,
+        name: name,
+        email: normalizedEmail,
+        password_hash: hash,
+        password_salt: salt,
+        biometric_profile: biometricProfile || null
+    };
+    saveJSONDatabase();
+    return JSON.parse(JSON.stringify(jsonUsers[normalizedUser]));
 }
 
 async function authenticatePassword(usernameOrEmail, password) {

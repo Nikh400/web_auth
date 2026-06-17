@@ -6,6 +6,7 @@ node_modules/
 
 # Database and Backups
 data/users.db
+data/users_db.json
 data/user_profile.json.bak
 
 # OS specific files
