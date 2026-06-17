@@ -17,6 +17,7 @@ if (process.env.MONGODB_URI) {
 
 const DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp' : path.join(__dirname, '..', 'data'));
 const JSON_DB_FILE = path.join(DATA_DIR, 'users_db.json');
+const JSON_OTP_FILE = path.join(DATA_DIR, 'otps_db.json');
 
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -24,6 +25,7 @@ if (!fs.existsSync(DATA_DIR)) {
 
 // ----------------- MONGODB CONFIGURATION & SCHEMAS -----------------
 let User;
+let Otp;
 let isConnected = false;
 
 async function ensureConnection() {
@@ -40,11 +42,13 @@ async function ensureConnection() {
         // Fallback to JSON if connection fails
         useMongoDB = false;
         initializeJSONDatabase();
+        initializeJSONOtpDatabase();
     }
 }
 
 // ----------------- JSON DATABASE INITIALIZATION & OPERATIONS -----------------
 let jsonUsers = {};
+let jsonOtps = {};
 
 if (useMongoDB) {
     const userSchema = new mongoose.Schema({
@@ -58,8 +62,18 @@ if (useMongoDB) {
     });
 
     User = mongoose.models.User || mongoose.model('User', userSchema);
+
+    const otpSchema = new mongoose.Schema({
+        email: { type: String, unique: true, required: true, lowercase: true },
+        code: { type: String, required: true },
+        expires_at: { type: Date, required: true },
+        verified: { type: Boolean, default: false }
+    });
+
+    Otp = mongoose.models.Otp || mongoose.model('Otp', otpSchema);
 } else {
     initializeJSONDatabase();
+    initializeJSONOtpDatabase();
 }
 
 function initializeJSONDatabase() {
@@ -86,6 +100,31 @@ function saveJSONDatabase() {
         return true;
     } catch (e) {
         console.error('[DB] Error writing JSON database:', e);
+        return false;
+    }
+}
+
+function initializeJSONOtpDatabase() {
+    console.log(`[DB] Initializing JSON OTP database at: ${JSON_OTP_FILE}`);
+    if (fs.existsSync(JSON_OTP_FILE)) {
+        try {
+            const raw = fs.readFileSync(JSON_OTP_FILE, 'utf8');
+            jsonOtps = JSON.parse(raw);
+        } catch (e) {
+            console.error('[DB] Error reading JSON OTP database:', e);
+            jsonOtps = {};
+        }
+    } else {
+        jsonOtps = {};
+    }
+}
+
+function saveJSONOtpDatabase() {
+    try {
+        fs.writeFileSync(JSON_OTP_FILE, JSON.stringify(jsonOtps, null, 4), 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[DB] Error writing JSON OTP database:', e);
         return false;
     }
 }
@@ -272,10 +311,105 @@ async function authenticatePassword(usernameOrEmail, password) {
     return safeUser;
 }
 
+// ----------------- OTP INTERFACE EXPORTS -----------------
+async function saveOTP(email, code, expiresAt) {
+    const cleanEmail = email.toLowerCase();
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                await Otp.findOneAndUpdate(
+                    { email: cleanEmail },
+                    { code, expires_at: new Date(expiresAt), verified: false },
+                    { upsert: true }
+                );
+                return;
+            }
+        } catch (err) {
+            console.error('[DB] Error saving OTP in MongoDB:', err);
+        }
+    }
+    
+    jsonOtps[cleanEmail] = {
+        code,
+        expiresAt,
+        verified: false
+    };
+    saveJSONOtpDatabase();
+}
+
+async function getOTP(email) {
+    const cleanEmail = email.toLowerCase();
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                const record = await Otp.findOne({ email: cleanEmail }).lean();
+                if (!record) return null;
+                return {
+                    code: record.code,
+                    expiresAt: record.expires_at.getTime(),
+                    verified: record.verified
+                };
+            }
+        } catch (err) {
+            console.error('[DB] Error fetching OTP from MongoDB:', err);
+        }
+    }
+
+    const record = jsonOtps[cleanEmail];
+    if (!record) return null;
+    return JSON.parse(JSON.stringify(record));
+}
+
+async function markOTPVerified(email) {
+    const cleanEmail = email.toLowerCase();
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                await Otp.updateOne({ email: cleanEmail }, { verified: true });
+                return;
+            }
+        } catch (err) {
+            console.error('[DB] Error marking OTP as verified in MongoDB:', err);
+        }
+    }
+
+    if (jsonOtps[cleanEmail]) {
+        jsonOtps[cleanEmail].verified = true;
+        saveJSONOtpDatabase();
+    }
+}
+
+async function deleteOTP(email) {
+    const cleanEmail = email.toLowerCase();
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            if (useMongoDB) {
+                await Otp.deleteOne({ email: cleanEmail });
+                return;
+            }
+        } catch (err) {
+            console.error('[DB] Error deleting OTP from MongoDB:', err);
+        }
+    }
+
+    if (jsonOtps[cleanEmail]) {
+        delete jsonOtps[cleanEmail];
+        saveJSONOtpDatabase();
+    }
+}
+
 module.exports = {
     getUserByUsername,
     getUserByEmail,
     getUserByUsernameOrEmail,
     registerUser,
-    authenticatePassword
+    authenticatePassword,
+    saveOTP,
+    getOTP,
+    markOTPVerified,
+    deleteOTP
 };

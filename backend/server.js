@@ -16,8 +16,7 @@ app.use(express.json());
 // SQLite Database Manager
 const dbManager = require('./database');
 
-// In-Memory OTP Cache
-const otpCache = new Map(); // key -> { code, expiresAt, verified }
+// In-Memory Failed Attempts Cache
 const biometricAttempts = new Map(); // key -> failed attempts count
 
 function generateOTP() {
@@ -83,11 +82,7 @@ app.post('/api/send-registration-otp', async (req, res) => {
         }
 
         const code = generateOTP();
-        otpCache.set(email.toLowerCase(), {
-            code,
-            expiresAt: Date.now() + 5 * 60 * 1000, // 5 min expiry
-            verified: false
-        });
+        await dbManager.saveOTP(email, code, Date.now() + 5 * 60 * 1000);
 
         await sendOTP(email, "Registration Verification", code);
         res.json({ success: true, message: "Verification code sent to your email." });
@@ -98,30 +93,35 @@ app.post('/api/send-registration-otp', async (req, res) => {
 });
 
 // POST verify registration OTP code
-app.post('/api/verify-registration-otp', (req, res) => {
+app.post('/api/verify-registration-otp', async (req, res) => {
     const { email, code } = req.body;
     if (!email || !code) {
         return res.status(400).json({ error: "Email and verification code are required." });
     }
 
     const emailClean = email.toLowerCase();
-    const record = otpCache.get(emailClean);
+    try {
+        const record = await dbManager.getOTP(emailClean);
 
-    if (!record) {
-        return res.status(400).json({ error: "No verification code requested for this email." });
+        if (!record) {
+            return res.status(400).json({ error: "No verification code requested for this email." });
+        }
+
+        if (record.expiresAt < Date.now()) {
+            await dbManager.deleteOTP(emailClean);
+            return res.status(400).json({ error: "Verification code has expired." });
+        }
+
+        if (record.code !== code.trim()) {
+            return res.status(400).json({ error: "Invalid verification code." });
+        }
+
+        await dbManager.markOTPVerified(emailClean);
+        res.json({ success: true, message: "Email successfully verified!" });
+    } catch (err) {
+        console.error("[SERVER] Verify registration OTP error:", err);
+        res.status(500).json({ error: "Verification failed." });
     }
-
-    if (record.expiresAt < Date.now()) {
-        otpCache.delete(emailClean);
-        return res.status(400).json({ error: "Verification code has expired." });
-    }
-
-    if (record.code !== code.trim()) {
-        return res.status(400).json({ error: "Invalid verification code." });
-    }
-
-    record.verified = true;
-    res.json({ success: true, message: "Email successfully verified!" });
 });
 
 // POST register user profile
@@ -134,13 +134,13 @@ app.post('/api/register', async (req, res) => {
 
     const emailClean = email.toLowerCase();
 
-    // Enforce OTP verification before registration
-    const record = otpCache.get(emailClean);
-    if (!record || !record.verified) {
-        return res.status(400).json({ error: "Email verification is required before finalizing registration." });
-    }
-
     try {
+        // Enforce OTP verification before registration
+        const record = await dbManager.getOTP(emailClean);
+        if (!record || !record.verified) {
+            return res.status(400).json({ error: "Email verification is required before finalizing registration." });
+        }
+
         // Double check uniqueness in database
         const userByName = await dbManager.getUserByUsername(username);
         if (userByName) {
@@ -179,8 +179,8 @@ app.post('/api/register', async (req, res) => {
 
         console.log(`[SERVER] Registered user: ${username}`);
         
-        // Clean up OTP cache
-        otpCache.delete(emailClean);
+        // Clean up OTP in database
+        await dbManager.deleteOTP(emailClean);
 
         // Return safe user object (omit sensitive fields)
         const { password_hash, password_salt, ...safeUser } = newUser;
@@ -249,11 +249,7 @@ app.post('/api/authenticate', async (req, res) => {
                 
                 // Auto generate 2FA OTP for fallback authentication
                 const code = generateOTP();
-                otpCache.set(usernameClean, {
-                    code,
-                    expiresAt: Date.now() + 5 * 60 * 1000,
-                    verified: false
-                });
+                await dbManager.saveOTP(usernameClean, code, Date.now() + 5 * 60 * 1000);
 
                 await sendOTP(user.email, "Biometric Verification Failure 2FA Fallback", code);
 
@@ -336,14 +332,14 @@ app.post('/api/authenticate-fallback', async (req, res) => {
 
         // 2. Verify OTP
         const usernameClean = user.username.toLowerCase();
-        const record = otpCache.get(usernameClean);
+        const record = await dbManager.getOTP(usernameClean);
 
         if (!record) {
             return res.status(400).json({ error: "No 2FA verification code requested for this user." });
         }
 
         if (record.expiresAt < Date.now()) {
-            otpCache.delete(usernameClean);
+            await dbManager.deleteOTP(usernameClean);
             return res.status(400).json({ error: "Verification code has expired." });
         }
 
@@ -351,8 +347,8 @@ app.post('/api/authenticate-fallback', async (req, res) => {
             return res.status(400).json({ error: "Invalid verification code." });
         }
 
-        // Successfully verified both! Clean cache
-        otpCache.delete(usernameClean);
+        // Successfully verified both! Clean database OTP
+        await dbManager.deleteOTP(usernameClean);
 
         // Generate token
         const token = crypto.createHmac('sha256', 'kinetic-secret-key')
