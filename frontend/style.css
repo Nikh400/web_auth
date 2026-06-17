@@ -728,3 +728,37 @@ header {
         transform: translateY(0);
     }
 }
+
+/* Button & Link Styles */
+.btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
+    border: none;
+    outline: none;
+    color: white;
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    transition: var(--transition);
+    box-shadow: 0 10px 20px rgba(0, 242, 254, 0.15);
+    margin-top: 15px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 25px rgba(0, 242, 254, 0.3);
+    opacity: 0.95;
+}
+
+.auth-mode-toggle a:hover {
+    filter: brightness(1.2);
+    text-shadow: 0 0 8px rgba(0, 242, 254, 0.4);
+}
+

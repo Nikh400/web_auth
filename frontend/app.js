@@ -1,14 +1,25 @@
-let targetPhrase = "biometric verification";
+let targetPhrase = "";
 let currentTab = "register";
-let username = "";
+let authMode = "biometric"; // "biometric" or "password"
+
+// Registration Form State
+let regName = "";
+let regEmail = "";
+let regUsername = "";
+let regPassword = "";
+
+// Dynamic Registration/Auth Phrases State
+let registrationPhrases = [];
+let defaultRedirectUrl = "";
 
 // Keystroke Recording State
-let regAttempts = []; // stores 5 trials of keystroke logs
+let regAttempts = []; // stores 3 trials of keystroke logs: [ { phrase, keystrokes }, ... ]
 let currentKeystrokes = [];
 let activeKeyPress = null; // tracks current active keypress timing: { index: number, pressTime: number }
 
 // DOM Elements
-const usernameInput = document.getElementById("username");
+const authUsernameInput = document.getElementById("auth-username");
+const authPasswordInput = document.getElementById("auth-password");
 const regInput = document.getElementById("reg-input");
 const authInput = document.getElementById("auth-input");
 const regStatus = document.getElementById("reg-status");
@@ -18,25 +29,57 @@ const lockVisual = document.getElementById("lock-visual");
 const lockIcon = document.getElementById("lock-icon");
 const lockLabel = document.getElementById("lock-label");
 
+// Registration Panels
+const regFormSection = document.getElementById("reg-form-section");
+const regOtpSection = document.getElementById("reg-otp-section");
+const regOtpCodeInput = document.getElementById("reg-otp-code");
+const regEnrollmentSection = document.getElementById("reg-enrollment-section");
+
+// Auth Sections
+const authBiometricSection = document.getElementById("auth-biometric-section");
+const authPasswordSection = document.getElementById("auth-password-section");
+const authFallbackSection = document.getElementById("auth-fallback-section");
+const authFallbackPasswordInput = document.getElementById("auth-fallback-password");
+const authFallbackOtpInput = document.getElementById("auth-fallback-otp");
+const toggleAuthModeLink = document.getElementById("toggle-auth-mode");
+
 // Telemetry Labels
 const telemetryChars = document.getElementById("telemetry-chars");
 const telemetryHold = document.getElementById("telemetry-hold");
 const telemetryFlight = document.getElementById("telemetry-flight");
 const telemetryWpm = document.getElementById("telemetry-wpm");
 
-// Fetch configuration from API on load
+// Fetch configuration and initial phrase from API on load
 async function fetchConfig() {
     try {
         const res = await fetch("/api/config");
         if (res.ok) {
             const data = await res.json();
-            targetPhrase = data.targetPhrase || targetPhrase;
-            document.getElementById("reg-target-phrase").textContent = targetPhrase;
-            document.getElementById("auth-target-phrase").textContent = targetPhrase;
-            telemetryChars.textContent = `0 / ${targetPhrase.length}`;
+            defaultRedirectUrl = data.defaultRedirect || "";
         }
+        await loadAuthenticationPhrase();
     } catch (e) {
         console.error("Failed to load backend config, using defaults:", e);
+        // Fallback target phrase
+        targetPhrase = "kinetic";
+        document.getElementById("auth-target-phrase").textContent = targetPhrase;
+        telemetryChars.textContent = `0 / ${targetPhrase.length}`;
+    }
+}
+
+// Fetch a random authentication phrase
+async function loadAuthenticationPhrase() {
+    try {
+        const res = await fetch("/api/phrases?count=1");
+        if (res.ok) {
+            const data = await res.json();
+            targetPhrase = data.phrases[0];
+            document.getElementById("auth-target-phrase").textContent = targetPhrase;
+            telemetryChars.textContent = `0 / ${targetPhrase.length}`;
+            resetTyping(authInput);
+        }
+    } catch (e) {
+        console.error("Failed to load authentication phrase:", e);
     }
 }
 
@@ -53,36 +96,42 @@ function switchTab(tab) {
     document.getElementById("panel-register").classList.toggle("active", tab === "register");
     document.getElementById("panel-auth").classList.toggle("active", tab === "auth");
 
-    // Reset current active typing state
+    // Reset current active typing states
     resetTyping(tab === "register" ? regInput : authInput);
     
-    // Focus appropriate input if enabled
-    if (username.length >= 3) {
-        setTimeout(() => {
-            if (tab === "register") regInput.focus();
-            else authInput.focus();
-        }, 100);
+    // Hide any open OTP / fallback states and switch
+    if (tab === "register") {
+        regOtpSection.style.display = "none";
+        regEnrollmentSection.style.display = "none";
+        regFormSection.style.display = "block";
+        document.getElementById("reg-fullname").focus();
+    } else {
+        authFallbackSection.style.display = "none";
+        toggleAuthModeLink.style.display = "inline-flex";
+        if (authMode === "biometric") {
+            authBiometricSection.style.display = "block";
+            authPasswordSection.style.display = "none";
+        } else {
+            authBiometricSection.style.display = "none";
+            authPasswordSection.style.display = "block";
+        }
+        authUsernameInput.focus();
+        loadAuthenticationPhrase();
     }
 }
 
-// Lock/Unlock inputs based on Username
-usernameInput.addEventListener("input", (e) => {
-    username = e.target.value.trim();
-    const disabled = username.length < 3;
-    regInput.disabled = disabled;
+// Lock/Unlock biometric auth input based on Username
+authUsernameInput.addEventListener("input", (e) => {
+    const val = e.target.value.trim();
+    const disabled = val.length < 3;
     authInput.disabled = disabled;
 
     if (disabled) {
-        regStatus.textContent = "Enter your username above to unlock the input box.";
-        authStatus.textContent = "Enter your username above to unlock the input box.";
-        resetRegistration();
+        authStatus.textContent = "Enter your username/email above to unlock.";
         resetAuthentication();
     } else {
-        if (currentTab === "register") {
-            regStatus.textContent = `Type the target phrase exactly to start Trial #1.`;
-            updateRegDots();
-        } else {
-            authStatus.textContent = `Ready. Type target phrase to authenticate.`;
+        if (authMode === "biometric") {
+            authStatus.textContent = "Ready. Type target phrase to authenticate.";
         }
     }
 });
@@ -118,7 +167,8 @@ function recordPreviousKeyIfUnfinished() {
 });
 
 function handleKeyDown(event, inputElement, isReg) {
-    if (username.length < 3) return;
+    const currentUsername = isReg ? regUsername : authUsernameInput.value.trim();
+    if (currentUsername.length < 3) return;
 
     // Catch Backspace or deletes early on desktop
     if (event.key === "Backspace" || event.key === "Delete") {
@@ -141,7 +191,8 @@ function handleKeyDown(event, inputElement, isReg) {
 }
 
 function handleBeforeInput(event, inputElement, isReg) {
-    if (username.length < 3) return;
+    const currentUsername = isReg ? regUsername : authUsernameInput.value.trim();
+    if (currentUsername.length < 3) return;
 
     const inputType = event.inputType;
 
@@ -173,7 +224,8 @@ function handleBeforeInput(event, inputElement, isReg) {
 }
 
 function handleKeyUp(event, inputElement, isReg) {
-    if (username.length < 3) return;
+    const currentUsername = isReg ? regUsername : authUsernameInput.value.trim();
+    if (currentUsername.length < 3) return;
 
     // If keyup is backspace/delete, it was already handled, just return
     if (event.key === "Backspace" || event.key === "Delete") {
@@ -237,8 +289,10 @@ function handleKeyUp(event, inputElement, isReg) {
 
 // Process single registration trial
 function processRegistrationTrial(inputElement) {
-    // Save current keystroke sequence
-    regAttempts.push([...currentKeystrokes]);
+    regAttempts.push({
+        phrase: targetPhrase,
+        keystrokes: [...currentKeystrokes]
+    });
     const attemptNum = regAttempts.length;
 
     showToast(`Trial #${attemptNum} completed!`, "success");
@@ -246,8 +300,12 @@ function processRegistrationTrial(inputElement) {
     resetTyping(inputElement);
     updateRegDots();
 
-    if (attemptNum < 5) {
-        regStatus.textContent = `Trial #${attemptNum} saved. Please type the phrase again (Trial #${attemptNum + 1}/5).`;
+    if (attemptNum < 3) {
+        // Advance to next target phrase
+        targetPhrase = registrationPhrases[attemptNum];
+        document.getElementById("reg-target-phrase").textContent = targetPhrase;
+        telemetryChars.textContent = `0 / ${targetPhrase.length}`;
+        regStatus.textContent = `Trial #${attemptNum} saved. Please type the next phrase (Trial #${attemptNum + 1}/3).`;
     } else {
         // Enforce training baseline creation
         regStatus.textContent = "Processing and submitting biometric template...";
@@ -262,7 +320,10 @@ async function submitRegistration() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: username,
+                username: regUsername,
+                name: regName,
+                email: regEmail,
+                password: regPassword,
                 attempts: regAttempts
             })
         });
@@ -270,7 +331,25 @@ async function submitRegistration() {
         const data = await res.json();
         if (res.ok) {
             showToast("Biometric baseline profile created!", "success");
-            regStatus.innerHTML = `<span style="color: var(--accent-cyan); font-weight: 600;">Registration Complete!</span> You can now switch to the 'Authenticate' tab to test.`;
+            regStatus.innerHTML = `<span style="color: var(--accent-cyan); font-weight: 600;">Registration Complete!</span> Pre-filling username for authentication.`;
+            
+            // Clear form and auto switch to authenticate tab
+            setTimeout(() => {
+                document.getElementById("reg-fullname").value = "";
+                document.getElementById("reg-email").value = "";
+                document.getElementById("reg-username").value = "";
+                document.getElementById("reg-password").value = "";
+                resetRegistration();
+                
+                regEnrollmentSection.style.display = "none";
+                regFormSection.style.display = "block";
+                
+                switchTab('auth');
+                authUsernameInput.value = regUsername;
+                authInput.disabled = false;
+                authStatus.textContent = "Ready. Type target phrase to authenticate.";
+                authInput.focus();
+            }, 2000);
         } else {
             showToast(data.error || "Registration failed.", "error");
             resetRegistration();
@@ -281,17 +360,67 @@ async function submitRegistration() {
     }
 }
 
+// Handle login success with dynamic redirection logic
+function handleLoginSuccess(user, token) {
+    // Store user details in sessionStorage
+    sessionStorage.setItem("currentUser", JSON.stringify(user));
+    if (token) {
+        sessionStorage.setItem("authToken", token);
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectParam = urlParams.get('redirect') || urlParams.get('redirect_uri') || defaultRedirectUrl;
+
+    if (redirectParam) {
+        try {
+            let redirectStr = redirectParam.trim();
+            if (!redirectStr.startsWith("http://") && !redirectStr.startsWith("https://") && !redirectStr.startsWith("/")) {
+                redirectStr = "https://" + redirectStr;
+            }
+            const baseUrl = redirectStr.startsWith("/") ? window.location.origin : undefined;
+            const redirectUrl = new URL(redirectStr, baseUrl);
+
+            redirectUrl.searchParams.set("status", "success");
+            redirectUrl.searchParams.set("username", user.username);
+            redirectUrl.searchParams.set("name", user.name);
+            redirectUrl.searchParams.set("email", user.email);
+            if (token) {
+                redirectUrl.searchParams.set("token", token);
+            }
+            
+            authStatus.innerHTML = `<span style="color: var(--neon-green); font-weight: bold;">Access Granted!</span> Redirecting to partner application in 3 seconds...`;
+            
+            setTimeout(() => {
+                window.location.href = redirectUrl.toString();
+            }, 3000);
+        } catch (err) {
+            console.error("Invalid redirect URL format, falling back to dashboard:", err);
+            authStatus.innerHTML = `<span style="color: var(--neon-green); font-weight: bold;">Access Granted!</span> Redirecting to dashboard in 3 seconds...`;
+            setTimeout(() => {
+                window.location.href = "dashboard.html";
+            }, 3000);
+        }
+    } else {
+        authStatus.innerHTML = `<span style="color: var(--neon-green); font-weight: bold;">Access Granted!</span> Redirecting to dashboard in 3 seconds...`;
+        setTimeout(() => {
+            window.location.href = "dashboard.html";
+        }, 3000);
+    }
+}
+
 // Process Authentication Attempt
 async function processAuthenticationAttempt(inputElement) {
     authStatus.textContent = "Verifying biometric signature...";
+    const currentUsername = authUsernameInput.value.trim();
     
     try {
         const res = await fetch("/api/authenticate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: username,
-                keystrokes: currentKeystrokes
+                username: currentUsername,
+                keystrokes: currentKeystrokes,
+                phrase: targetPhrase
             })
         });
 
@@ -299,7 +428,6 @@ async function processAuthenticationAttempt(inputElement) {
         
         if (res.ok) {
             if (data.success) {
-                // Unlock Visual
                 lockVisual.className = "lock-visual unlocked";
                 lockIcon.className = "fa-solid fa-lock-open";
                 lockLabel.textContent = "UNLOCKED";
@@ -307,18 +435,31 @@ async function processAuthenticationAttempt(inputElement) {
                 authStatus.innerHTML = `<span style="color: var(--neon-green); font-weight: bold;">Access Granted!</span> Match Confidence: ${data.score}% (Z-Score: ${data.avgZ})`;
                 showToast(`Identity verified successfully (${data.score}% similarity)!`, "success");
 
-                // Redirect to the secure dashboard page after a short visual delay
-                setTimeout(() => {
-                    window.location.href = "dashboard.html";
-                }, 1500);
-            } else {
-                // Locked Visual shake
+                handleLoginSuccess(data.user, data.token);
+            } else if (data.fallbackRequired) {
                 lockVisual.classList.add("locked");
                 lockVisual.style.animation = "shake 0.4s ease";
                 setTimeout(() => lockVisual.style.animation = "", 400);
 
-                authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Access Denied!</span> Rhythm mismatch. Match Confidence: ${data.score}% (Z-Score: ${data.avgZ})`;
-                showToast(`Verification failed (${data.score}% similarity).`, "error");
+                authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Rhythm Mismatch!</span> 2FA verification required.`;
+                showToast("Biometric mismatch. Verification code sent to email.", "warning");
+
+                // Transition UI to 2FA fallback inputs
+                authBiometricSection.style.display = "none";
+                authPasswordSection.style.display = "none";
+                toggleAuthModeLink.style.display = "none";
+
+                authFallbackSection.style.display = "block";
+                authFallbackPasswordInput.value = "";
+                authFallbackOtpInput.value = "";
+                setTimeout(() => authFallbackPasswordInput.focus(), 150);
+            } else {
+                lockVisual.classList.add("locked");
+                lockVisual.style.animation = "shake 0.4s ease";
+                setTimeout(() => lockVisual.style.animation = "", 400);
+
+                authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Rhythm Mismatch!</span> ${data.message || "Match Confidence: " + data.score + "%"}`;
+                showToast(data.message || `Verification failed (${data.score}% similarity).`, "error");
             }
         } else {
             showToast(data.error || "Authentication failed.", "error");
@@ -357,12 +498,13 @@ function resetAuthentication() {
 
 // Update dots layout on Registration Tab
 function updateRegDots() {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
         const dot = document.getElementById(`dot-${i}`);
+        if (!dot) continue;
         dot.className = "step-dot";
         if (i < regAttempts.length) {
             dot.classList.add("completed");
-        } else if (i === regAttempts.length && username.length >= 3) {
+        } else if (i === regAttempts.length) {
             dot.classList.add("active");
         }
     }
@@ -407,6 +549,253 @@ function showToast(message, type = "info") {
         toast.classList.remove("show");
         setTimeout(() => toast.remove(), 400);
     }, 3200);
+}
+
+// Start email verification flow
+async function startBiometricEnrollment() {
+    regName = document.getElementById("reg-fullname").value.trim();
+    regEmail = document.getElementById("reg-email").value.trim();
+    regUsername = document.getElementById("reg-username").value.trim();
+    regPassword = document.getElementById("reg-password").value;
+
+    if (!regName || regName.length < 3) {
+        showToast("Full Name must be at least 3 characters long.", "error");
+        return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(regEmail)) {
+        showToast("Please enter a valid email address.", "error");
+        return;
+    }
+
+    if (!regUsername || regUsername.length < 3) {
+        showToast("Username must be at least 3 characters long.", "error");
+        return;
+    }
+
+    if (!regPassword || regPassword.length < 6) {
+        showToast("Backup Password must be at least 6 characters long.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/send-registration-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: regUsername, email: regEmail })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || "Email OTP request failed.", "error");
+            return;
+        }
+
+        showToast("Verification code sent to your email!", "success");
+        regFormSection.style.display = "none";
+        regOtpSection.style.display = "block";
+        regOtpCodeInput.value = "";
+        setTimeout(() => regOtpCodeInput.focus(), 150);
+
+    } catch (e) {
+        console.error("Check user error:", e);
+        showToast("Network error verifying user credentials.", "error");
+    }
+}
+
+function backToDetails() {
+    regOtpSection.style.display = "none";
+    regFormSection.style.display = "block";
+}
+
+// Submit 6-digit registration OTP code to verify email address
+async function submitRegistrationOTP() {
+    const code = regOtpCodeInput.value.trim();
+    if (code.length !== 6) {
+        showToast("Verification code must be exactly 6 digits.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/verify-registration-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: regEmail, code })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || "Verification failed.", "error");
+            return;
+        }
+
+        showToast("Email successfully verified!", "success");
+
+        // Fetch enrollment phrases
+        const phraseRes = await fetch("/api/phrases?count=3");
+        if (phraseRes.ok) {
+            const phraseData = await phraseRes.json();
+            registrationPhrases = phraseData.phrases;
+        } else {
+            registrationPhrases = [
+                "secure",
+                "pattern",
+                "defense"
+            ];
+        }
+
+        // Set the initial enrollment phrase
+        targetPhrase = registrationPhrases[0];
+        document.getElementById("reg-target-phrase").textContent = targetPhrase;
+        telemetryChars.textContent = `0 / ${targetPhrase.length}`;
+
+        // Go to Enrollment panel
+        regOtpSection.style.display = "none";
+        regEnrollmentSection.style.display = "block";
+
+        regInput.disabled = false;
+        resetRegistration();
+        setTimeout(() => regInput.focus(), 150);
+    } catch (e) {
+        console.error("Verification code submit error:", e);
+        showToast("Network error during verification.", "error");
+    }
+}
+
+function backToRegistrationForm() {
+    regEnrollmentSection.style.display = "none";
+    regFormSection.style.display = "block";
+}
+
+function toggleAuthMode(event) {
+    if (event) event.preventDefault();
+
+    if (authMode === "biometric") {
+        authMode = "password";
+        authBiometricSection.style.display = "none";
+        authPasswordSection.style.display = "block";
+        toggleAuthModeLink.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Use Biometric Verification instead`;
+        authPasswordInput.focus();
+    } else {
+        authMode = "biometric";
+        authPasswordSection.style.display = "none";
+        authBiometricSection.style.display = "block";
+        toggleAuthModeLink.innerHTML = `<i class="fa-solid fa-key"></i> Use Backup Password instead`;
+        
+        if (authUsernameInput.value.trim().length >= 3) {
+            authInput.disabled = false;
+            authStatus.textContent = "Ready. Type target phrase to authenticate.";
+            authInput.focus();
+        } else {
+            authInput.disabled = true;
+            authStatus.textContent = "Enter your username/email above to unlock.";
+        }
+    }
+}
+
+async function submitPasswordAuth() {
+    const usernameOrEmail = authUsernameInput.value.trim();
+    const password = authPasswordInput.value;
+
+    if (!usernameOrEmail || usernameOrEmail.length < 3) {
+        showToast("Please enter your username or email.", "error");
+        return;
+    }
+
+    if (!password) {
+        showToast("Please enter your backup password.", "error");
+        return;
+    }
+
+    authStatus.textContent = "Verifying password...";
+
+    try {
+        const res = await fetch("/api/authenticate-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ usernameOrEmail, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            lockVisual.className = "lock-visual unlocked";
+            lockIcon.className = "fa-solid fa-lock-open";
+            lockLabel.textContent = "UNLOCKED";
+            
+            showToast("Password verified successfully!", "success");
+            
+            handleLoginSuccess(data.user, data.token);
+        } else {
+            showToast(data.error || "Password verification failed.", "error");
+            authStatus.textContent = data.error || "Password verification failed.";
+        }
+    } catch (e) {
+        console.error("Password authentication network error:", e);
+        showToast("Server network error during password authentication.", "error");
+        authStatus.textContent = "Network error.";
+    }
+}
+
+// Submit backup password + OTP fallback (2FA) credentials
+async function submitFallbackAuth() {
+    const username = authUsernameInput.value.trim();
+    const password = authFallbackPasswordInput.value;
+    const otp = authFallbackOtpInput.value.trim();
+
+    if (!password) {
+        showToast("Please enter your backup password.", "error");
+        return;
+    }
+
+    if (otp.length !== 6) {
+        showToast("Please enter the 6-digit verification code.", "error");
+        return;
+    }
+
+    authStatus.textContent = "Verifying 2FA credentials...";
+
+    try {
+        const res = await fetch("/api/authenticate-fallback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, otp })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            lockVisual.className = "lock-visual unlocked";
+            lockIcon.className = "fa-solid fa-lock-open";
+            lockLabel.textContent = "UNLOCKED";
+            
+            showToast("Two-factor credentials verified!", "success");
+            
+            handleLoginSuccess(data.user, data.token);
+        } else {
+            showToast(data.error || "2FA verification failed.", "error");
+            authStatus.textContent = data.error || "2FA verification failed.";
+        }
+    } catch (e) {
+        console.error("Fallback auth network error:", e);
+        showToast("Server network error during fallback authentication.", "error");
+        authStatus.textContent = "Network error.";
+    }
+}
+
+function cancelFallbackAuth() {
+    authFallbackSection.style.display = "none";
+    toggleAuthModeLink.style.display = "inline-flex";
+    
+    if (authMode === "biometric") {
+        authBiometricSection.style.display = "block";
+        authStatus.textContent = "Ready. Type target phrase to authenticate.";
+        setTimeout(() => authInput.focus(), 150);
+    } else {
+        authPasswordSection.style.display = "block";
+        setTimeout(() => authPasswordInput.focus(), 150);
+    }
 }
 
 // Init config fetch on page load

@@ -7,7 +7,10 @@
     "start": "node backend/server.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "nodemailer": "^9.0.1",
+    "sqlite3": "^6.0.1"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Local Environment Variables
+.env
+
+# Database and Backups
+data/users.db
+data/user_profile.json.bak
+
+# OS specific files
+.DS_Store
+Thumbs.db

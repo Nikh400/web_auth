@@ -41,69 +41,170 @@
                 </button>
             </div>
 
-            <!-- Username Box -->
-            <div class="input-group">
-                <label for="username"><i class="fa-solid fa-user"></i> Username</label>
-                <input type="text" id="username" placeholder="Enter user identification..." autocomplete="off">
-            </div>
-
             <!-- Panel Container -->
             <div class="panel-container">
                 <!-- Registration Panel -->
                 <div class="panel active" id="panel-register">
-                    <div class="panel-header">
-                        <h2>Biometric Enrollment</h2>
-                        <p>Type the target phrase exactly 5 times to register your unique typing rhythm.</p>
-                    </div>
-
-                    <!-- Steps Dots -->
-                    <div class="steps-container">
-                        <span class="step-dot" id="dot-0">1</span>
-                        <span class="step-dot" id="dot-1">2</span>
-                        <span class="step-dot" id="dot-2">3</span>
-                        <span class="step-dot" id="dot-3">4</span>
-                        <span class="step-dot" id="dot-4">5</span>
-                    </div>
-
-                    <!-- Instruction Card -->
-                    <div class="phrase-card">
-                        <div class="phrase-label">TARGET PHRASE</div>
-                        <div class="phrase-text" id="reg-target-phrase">biometric verification</div>
-                        <div class="phrase-input-container">
-                            <input type="text" class="phrase-input" id="reg-input" placeholder="Type target phrase here..." autocomplete="off" disabled>
+                    <!-- Registration Form Section -->
+                    <div id="reg-form-section">
+                        <div class="panel-header">
+                            <h2>Profile Details</h2>
+                            <p>Enter your credentials to proceed to biometric enrollment.</p>
                         </div>
+                        
+                        <div class="input-group">
+                            <label for="reg-fullname"><i class="fa-solid fa-address-card"></i> Full Name</label>
+                            <input type="text" id="reg-fullname" placeholder="Enter your full name..." autocomplete="name">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+                            <input type="email" id="reg-email" placeholder="Enter your email address..." autocomplete="email">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-username"><i class="fa-solid fa-user-tag"></i> Username</label>
+                            <input type="text" id="reg-username" placeholder="Choose a username..." autocomplete="username">
+                        </div>
+                        <div class="input-group">
+                            <label for="reg-password"><i class="fa-solid fa-key"></i> Backup Password</label>
+                            <input type="password" id="reg-password" placeholder="Choose a backup password..." autocomplete="new-password">
+                        </div>
+
+                        <button type="button" class="btn-primary" id="btn-to-enrollment" onclick="startBiometricEnrollment()">
+                            Continue to Biometric Enrollment <i class="fa-solid fa-arrow-right"></i>
+                        </button>
                     </div>
 
-                    <div class="status-msg" id="reg-status">Enter your username above to unlock the input box.</div>
+                    <!-- Email Verification OTP Section (Hidden Initially) -->
+                    <div id="reg-otp-section" style="display: none;">
+                        <div class="panel-header">
+                            <h2>Verify Your Email</h2>
+                            <p>We've sent a 6-digit verification code to your email address.</p>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="reg-otp-code"><i class="fa-solid fa-envelope-open"></i> Verification Code</label>
+                            <input type="text" id="reg-otp-code" placeholder="Enter the 6-digit code..." maxlength="6" autocomplete="off" style="text-align: center; font-size: 1.5rem; letter-spacing: 4px; font-weight: bold; font-family: var(--font-mono);">
+                        </div>
+
+                        <button type="button" class="btn-primary" id="btn-verify-otp" onclick="submitRegistrationOTP()">
+                            Verify & Start Biometrics <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+
+                        <button type="button" id="btn-back-to-details" onclick="backToDetails()" style="margin-top: 15px; width: 100%; padding: 12px; border-radius: 12px; font-family: var(--font-sans); font-weight: 600; cursor: pointer; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-secondary); transition: var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Details
+                        </button>
+                    </div>
+
+                    <!-- Biometric Enrollment Section (Hidden Initially) -->
+                    <div id="reg-enrollment-section" style="display: none;">
+                        <div class="panel-header">
+                            <h2>Biometric Enrollment</h2>
+                            <p>Type the target phrase exactly 3 times to register your unique typing rhythm.</p>
+                        </div>
+
+                        <!-- Steps Dots -->
+                        <div class="steps-container">
+                            <span class="step-dot" id="dot-0">1</span>
+                            <span class="step-dot" id="dot-1">2</span>
+                            <span class="step-dot" id="dot-2">3</span>
+                        </div>
+
+                        <!-- Instruction Card -->
+                        <div class="phrase-card">
+                            <div class="phrase-label">TARGET PHRASE</div>
+                            <div class="phrase-text" id="reg-target-phrase">biometric verification</div>
+                            <div class="phrase-input-container">
+                                <input type="text" class="phrase-input" id="reg-input" placeholder="Type target phrase here..." autocomplete="off" disabled>
+                            </div>
+                        </div>
+
+                        <div class="status-msg" id="reg-status">Ready to enroll. Type the target phrase.</div>
+                        
+                        <button type="button" id="btn-back-to-form" onclick="backToRegistrationForm()" style="margin-top: 15px; width: 100%; padding: 12px; border-radius: 12px; font-family: var(--font-sans); font-weight: 600; cursor: pointer; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-secondary); transition: var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fa-solid fa-arrow-left"></i> Edit Profile Details
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Authentication Panel -->
                 <div class="panel" id="panel-auth">
                     <div class="panel-header">
                         <h2>Identity Verification</h2>
-                        <p>Type the target phrase in your natural rhythm to authenticate.</p>
+                        <p>Verify your identity using your typing rhythm or backup password.</p>
                     </div>
 
-                    <div class="auth-state">
-                        <div class="lock-visual locked" id="lock-visual">
-                            <div class="lock-ring"></div>
-                            <div class="lock-icon-wrapper">
-                                <i class="fa-solid fa-lock" id="lock-icon"></i>
+                    <div class="input-group" style="margin-bottom: 15px;">
+                        <label for="auth-username"><i class="fa-solid fa-user"></i> Username or Email</label>
+                        <input type="text" id="auth-username" placeholder="Enter username or email..." autocomplete="username">
+                    </div>
+
+                    <div class="auth-mode-toggle" style="text-align: right; margin-bottom: 20px;">
+                        <a href="#" id="toggle-auth-mode" onclick="toggleAuthMode(event)" style="color: var(--accent-cyan); font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition);">
+                            <i class="fa-solid fa-key"></i> Use Backup Password instead
+                        </a>
+                    </div>
+
+                    <!-- Biometric Section (Visible by default) -->
+                    <div id="auth-biometric-section">
+                        <div class="auth-state">
+                            <div class="lock-visual locked" id="lock-visual">
+                                <div class="lock-ring"></div>
+                                <div class="lock-icon-wrapper">
+                                    <i class="fa-solid fa-lock" id="lock-icon"></i>
+                                </div>
+                                <div class="lock-label" id="lock-label">LOCKED</div>
                             </div>
-                            <div class="lock-label" id="lock-label">LOCKED</div>
                         </div>
+
+                        <!-- Instruction Card -->
+                        <div class="phrase-card">
+                            <div class="phrase-label">TARGET PHRASE</div>
+                            <div class="phrase-text" id="auth-target-phrase">biometric verification</div>
+                            <div class="phrase-input-container">
+                                <input type="text" class="phrase-input" id="auth-input" placeholder="Type target phrase here to unlock..." autocomplete="off" disabled>
+                            </div>
+                        </div>
+
+                        <div class="status-msg" id="auth-status">Enter your username/email above to unlock.</div>
                     </div>
 
-                    <!-- Instruction Card -->
-                    <div class="phrase-card">
-                        <div class="phrase-label">TARGET PHRASE</div>
-                        <div class="phrase-text" id="auth-target-phrase">biometric verification</div>
-                        <div class="phrase-input-container">
-                            <input type="text" class="phrase-input" id="auth-input" placeholder="Type target phrase here to unlock..." autocomplete="off" disabled>
+                    <!-- Password Section (Hidden by default) -->
+                    <div id="auth-password-section" style="display: none;">
+                        <div class="input-group">
+                            <label for="auth-password"><i class="fa-solid fa-key"></i> Backup Password</label>
+                            <input type="password" id="auth-password" placeholder="Enter your backup password..." autocomplete="current-password">
                         </div>
+
+                        <button type="button" class="btn-primary" id="btn-password-auth" onclick="submitPasswordAuth()" style="background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);">
+                            Verify Password & Unlock <i class="fa-solid fa-unlock"></i>
+                        </button>
                     </div>
 
-                    <div class="status-msg" id="auth-status">Enter your username above to unlock the input box.</div>
+                    <!-- Fallback 2FA Section (Hidden by default, triggered on biometric fail) -->
+                    <div id="auth-fallback-section" style="display: none;">
+                        <div class="panel-header" style="text-align: center; margin-bottom: 15px;">
+                            <h3 style="color: var(--neon-red); font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-triangle-exclamation"></i> 2FA Fallback Verification</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">Biometric verification failed. Please enter your backup password and the verification code sent to your email.</p>
+                        </div>
+                        
+                        <div class="input-group" style="margin-bottom: 15px;">
+                            <label for="auth-fallback-password"><i class="fa-solid fa-key"></i> Backup Password</label>
+                            <input type="password" id="auth-fallback-password" placeholder="Enter your backup password...">
+                        </div>
+
+                        <div class="input-group" style="margin-bottom: 20px;">
+                            <label for="auth-fallback-otp"><i class="fa-solid fa-envelope-open"></i> Email Verification Code</label>
+                            <input type="text" id="auth-fallback-otp" placeholder="Enter 6-digit code..." maxlength="6" style="text-align: center; font-size: 1.25rem; letter-spacing: 2px; font-weight: bold; font-family: var(--font-mono);">
+                        </div>
+
+                        <button type="button" class="btn-primary" id="btn-fallback-auth" onclick="submitFallbackAuth()" style="background: linear-gradient(135deg, var(--neon-red) 0%, var(--accent-purple) 100%);">
+                            Verify Fallback & Unlock <i class="fa-solid fa-unlock"></i>
+                        </button>
+
+                        <button type="button" onclick="cancelFallbackAuth()" style="margin-top: 15px; width: 100%; padding: 12px; border-radius: 12px; font-family: var(--font-sans); font-weight: 600; cursor: pointer; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-secondary); transition: var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fa-solid fa-arrow-left"></i> Try Biometric again
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>

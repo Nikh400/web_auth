@@ -149,19 +149,29 @@
             
             <div class="dashboard-header">
                 <h2>Access Granted</h2>
-                <p>Your unique typing signature has been verified successfully.</p>
+                <p id="dashboard-welcome-msg">Your unique typing signature has been verified successfully.</p>
             </div>
 
             <div class="dashboard-grid">
                 <div class="dashboard-item">
+                    <i class="fa-solid fa-user-tag item-icon" style="color: var(--accent-purple); filter: drop-shadow(0 0 8px rgba(162, 89, 255, 0.3));"></i>
+                    <div class="item-title">Username</div>
+                    <div class="item-value" id="user-username">---</div>
+                </div>
+                <div class="dashboard-item">
+                    <i class="fa-solid fa-address-card item-icon" style="color: var(--accent-cyan); filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.3));"></i>
+                    <div class="item-title">Full Name</div>
+                    <div class="item-value" id="user-name">---</div>
+                </div>
+                <div class="dashboard-item">
+                    <i class="fa-solid fa-envelope item-icon" style="color: var(--accent-cyan); filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.3));"></i>
+                    <div class="item-title">Email Address</div>
+                    <div class="item-value" id="user-email">---</div>
+                </div>
+                <div class="dashboard-item">
                     <i class="fa-solid fa-shield-halved item-icon" style="color: var(--neon-green); filter: drop-shadow(0 0 8px rgba(57, 255, 20, 0.3));"></i>
                     <div class="item-title">Security Status</div>
                     <div class="item-value" style="color: var(--neon-green);">AUTHENTICATED</div>
-                </div>
-                <div class="dashboard-item">
-                    <i class="fa-solid fa-gauge-high item-icon" style="color: var(--accent-cyan); filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.3));"></i>
-                    <div class="item-title">Timing Profile</div>
-                    <div class="item-value" style="color: var(--accent-cyan);">OPTIMAL RHYTHM</div>
                 </div>
             </div>
 
@@ -172,7 +182,31 @@
     </div>
 
     <script>
+        // Check authentication status on load
+        document.addEventListener("DOMContentLoaded", () => {
+            const userJson = sessionStorage.getItem("currentUser");
+            if (!userJson) {
+                // Not authenticated, redirect to login page
+                window.location.href = "index.html";
+                return;
+            }
+
+            try {
+                const user = JSON.parse(userJson);
+                document.getElementById("user-name").textContent = user.name || "N/A";
+                document.getElementById("user-email").textContent = user.email || "N/A";
+                document.getElementById("user-username").textContent = user.username || "N/A";
+                
+                // Display welcome greeting
+                document.getElementById("dashboard-welcome-msg").textContent = `Welcome back, ${user.name || user.username}!`;
+            } catch (e) {
+                console.error("Error parsing user session:", e);
+                window.location.href = "index.html";
+            }
+        });
+
         function logout() {
+            sessionStorage.removeItem("currentUser");
             window.location.href = "index.html";
         }
     </script>
