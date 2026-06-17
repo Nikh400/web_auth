@@ -25,6 +25,24 @@ function generateOTP() {
 
 // REST API routes
 
+// GET server health & diagnostics
+app.get('/api/health', async (req, res) => {
+    try {
+        const dbStatus = await dbManager.getHealthStatus();
+        res.json({
+            status: "healthy",
+            vercel: !!process.env.VERCEL,
+            database: dbStatus,
+            smtp: {
+                configured: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+                user: process.env.SMTP_USER || null
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ status: "unhealthy", error: err.message });
+    }
+});
+
 // GET config details
 app.get('/api/config', (req, res) => {
     const defaultRedirect = process.env.REDIRECT_URL || "";

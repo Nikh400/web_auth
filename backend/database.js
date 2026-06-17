@@ -402,6 +402,27 @@ async function deleteOTP(email) {
     }
 }
 
+async function getHealthStatus() {
+    let mongoConnected = false;
+    let mongoError = null;
+
+    if (useMongoDB) {
+        try {
+            await ensureConnection();
+            mongoConnected = isConnected;
+        } catch (err) {
+            mongoError = err.message;
+        }
+    }
+
+    return {
+        mode: useMongoDB ? "MongoDB Atlas" : "JSON Fallback File",
+        connected: mongoConnected,
+        error: mongoError,
+        jsonFile: !useMongoDB ? JSON_DB_FILE : null
+    };
+}
+
 module.exports = {
     getUserByUsername,
     getUserByEmail,
@@ -411,5 +432,6 @@ module.exports = {
     saveOTP,
     getOTP,
     markOTPVerified,
-    deleteOTP
+    deleteOTP,
+    getHealthStatus
 };
