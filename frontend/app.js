@@ -329,8 +329,12 @@ function handleKeyDown(event, inputElement, isReg) {
     // Catch Backspace or deletes early on desktop
     if (event.key === "Backspace" || event.key === "Delete") {
         event.preventDefault();
-        showToast("Typos reset the timer. Starting over!", "error");
-        resetTyping(inputElement);
+        showToast("Typos reset the timer. Rotating phrase!", "error");
+        if (isReg) {
+            rotateRegistrationPhrase();
+        } else {
+            loadAuthenticationPhrase();
+        }
         return;
     }
 
@@ -355,8 +359,12 @@ function handleBeforeInput(event, inputElement, isReg) {
     // Catch Backspace / Delete or pasting on mobile and desktop
     if (inputType && (inputType.startsWith("delete") || inputType === "insertFromPaste" || inputType === "insertReplacementText")) {
         event.preventDefault();
-        showToast("Typos / pasting reset the timer. Starting over!", "error");
-        resetTyping(inputElement);
+        showToast("Typos / pasting reset the timer. Rotating phrase!", "error");
+        if (isReg) {
+            rotateRegistrationPhrase();
+        } else {
+            loadAuthenticationPhrase();
+        }
         return;
     }
 
@@ -370,8 +378,12 @@ function handleBeforeInput(event, inputElement, isReg) {
     const expectedChar = targetPhrase[nextCharIndex];
     if (char.toLowerCase() !== expectedChar) {
         event.preventDefault();
-        showToast(`Typo! Expected "${expectedChar}" but pressed "${char}". Trial reset.`, "error");
-        resetTyping(inputElement);
+        showToast(`Typo! Expected "${expectedChar}" but pressed "${char}". Rotating phrase.`, "error");
+        if (isReg) {
+            rotateRegistrationPhrase();
+        } else {
+            loadAuthenticationPhrase();
+        }
         return;
     }
 
