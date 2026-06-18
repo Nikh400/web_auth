@@ -137,6 +137,12 @@
                         <p>Verify your identity using your password and typing rhythm.</p>
                     </div>
 
+                    <!-- Noticeable but non-annoying prompt alert banner -->
+                    <div id="auth-alert-banner" class="alert-banner" style="display: none;">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span id="auth-alert-text">Please enter your password to start biometric verification.</span>
+                    </div>
+
                     <div class="input-group" style="margin-bottom: 15px;">
                         <label for="auth-username"><i class="fa-solid fa-user"></i> Username or Email</label>
                         <input type="text" id="auth-username" placeholder="Enter username or email..." autocomplete="username">

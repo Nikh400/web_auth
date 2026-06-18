@@ -110,7 +110,47 @@ function switchTab(tab) {
         authBiometricSection.style.display = "block";
         authUsernameInput.focus();
         loadAuthenticationPhrase();
+        
+        // Clear password explicitly on tab switch to prevent auto-fill
+        authPasswordInput.value = "";
+        const markerIcon = document.getElementById("password-status-icon");
+        if (markerIcon) {
+            markerIcon.style.display = "none";
+            markerIcon.className = "";
+        }
+        updateAlertBanner("info", "Please enter your password to start biometric verification.");
+        
         updateAuthInputState();
+    }
+}
+
+// Helper to update custom alert banner styles and text
+function updateAlertBanner(status, text) {
+    const banner = document.getElementById("auth-alert-banner");
+    const bannerText = document.getElementById("auth-alert-text");
+    if (!banner || !bannerText) return;
+
+    banner.style.display = "flex";
+    bannerText.textContent = text;
+
+    if (status === "success") {
+        banner.style.background = "rgba(57, 255, 20, 0.08)";
+        banner.style.borderColor = "rgba(57, 255, 20, 0.3)";
+        banner.style.color = "var(--neon-green)";
+        const icon = banner.querySelector('i');
+        if (icon) icon.className = "fa-solid fa-circle-check";
+    } else if (status === "error") {
+        banner.style.background = "rgba(255, 56, 56, 0.08)";
+        banner.style.borderColor = "rgba(255, 56, 56, 0.3)";
+        banner.style.color = "var(--neon-red)";
+        const icon = banner.querySelector('i');
+        if (icon) icon.className = "fa-solid fa-circle-xmark";
+    } else {
+        banner.style.background = "rgba(0, 242, 254, 0.08)";
+        banner.style.borderColor = "rgba(0, 242, 254, 0.3)";
+        banner.style.color = "var(--accent-cyan)";
+        const icon = banner.querySelector('i');
+        if (icon) icon.className = "fa-solid fa-circle-info";
     }
 }
 // Lock/Unlock biometric auth input based on Username and Password
@@ -142,6 +182,7 @@ async function verifyPasswordOnInput() {
     if (!username || username.length < 3 || !password) {
         markerIcon.style.display = "none";
         markerIcon.className = "";
+        updateAlertBanner("info", "Please enter your password to start biometric verification.");
         return;
     }
 
@@ -158,10 +199,12 @@ async function verifyPasswordOnInput() {
                     markerIcon.style.display = "block";
                     markerIcon.className = "fa-solid fa-circle-check";
                     markerIcon.style.color = "var(--neon-green)";
+                    updateAlertBanner("success", "Password verified! Please type the target phrase below to unlock.");
                 } else {
                     markerIcon.style.display = "block";
                     markerIcon.className = "fa-solid fa-circle-xmark";
                     markerIcon.style.color = "var(--neon-red)";
+                    updateAlertBanner("error", "Incorrect password. Please enter your correct password.");
                 }
             } else {
                 markerIcon.style.display = "none";
@@ -185,6 +228,7 @@ async function triggerImmediatePasswordVerify() {
     if (!username || username.length < 3 || !password) {
         markerIcon.style.display = "none";
         markerIcon.className = "";
+        updateAlertBanner("info", "Please enter your password to start biometric verification.");
         return;
     }
 
@@ -200,10 +244,12 @@ async function triggerImmediatePasswordVerify() {
                 markerIcon.style.display = "block";
                 markerIcon.className = "fa-solid fa-circle-check";
                 markerIcon.style.color = "var(--neon-green)";
+                updateAlertBanner("success", "Password verified! Please type the target phrase below to unlock.");
             } else {
                 markerIcon.style.display = "block";
                 markerIcon.className = "fa-solid fa-circle-xmark";
                 markerIcon.style.color = "var(--neon-red)";
+                updateAlertBanner("error", "Incorrect password. Please enter your correct password.");
             }
         } else {
             markerIcon.style.display = "none";
@@ -435,9 +481,13 @@ async function submitRegistration() {
                 
                 switchTab('auth');
                 authUsernameInput.value = regUsername;
-                authInput.disabled = false;
-                authStatus.textContent = "Ready. Type target phrase to authenticate.";
-                authInput.focus();
+                authPasswordInput.value = ""; // Clear password explicitly to prevent browser autofill
+                
+                // Show registration successful message in the alert banner
+                updateAlertBanner("info", "Profile baseline created successfully! Please enter your password to start biometric verification.");
+                
+                authInput.disabled = true; // Keep target phrase input locked until password is verified
+                authStatus.textContent = "Enter your username/email and password above to unlock.";
             }, 2000);
         } else {
             showToast(data.error || "Registration failed.", "error");
