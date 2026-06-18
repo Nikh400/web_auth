@@ -65,8 +65,12 @@
                             <input type="text" id="reg-username" placeholder="Choose a username..." autocomplete="username">
                         </div>
                         <div class="input-group">
-                            <label for="reg-password"><i class="fa-solid fa-key"></i> Backup Password</label>
-                            <input type="password" id="reg-password" placeholder="Choose a backup password..." autocomplete="new-password">
+                            <label for="reg-password"><i class="fa-solid fa-key"></i> Password</label>
+                            <input type="password" id="reg-password" placeholder="Choose a password..." autocomplete="new-password">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 20px;">
+                            <label for="reg-confirm-password"><i class="fa-solid fa-key"></i> Retype Password</label>
+                            <input type="password" id="reg-confirm-password" placeholder="Retype your password..." autocomplete="new-password">
                         </div>
 
                         <button type="button" class="btn-primary" id="btn-to-enrollment" onclick="startBiometricEnrollment()">
@@ -130,7 +134,7 @@
                 <div class="panel" id="panel-auth">
                     <div class="panel-header">
                         <h2>Identity Verification</h2>
-                        <p>Verify your identity using your backup password and typing rhythm.</p>
+                        <p>Verify your identity using your password and typing rhythm.</p>
                     </div>
 
                     <div class="input-group" style="margin-bottom: 15px;">
@@ -138,9 +142,12 @@
                         <input type="text" id="auth-username" placeholder="Enter username or email..." autocomplete="username">
                     </div>
 
-                    <div class="input-group" style="margin-bottom: 15px;">
-                        <label for="auth-password"><i class="fa-solid fa-key"></i> Backup Password</label>
-                        <input type="password" id="auth-password" placeholder="Enter your backup password..." autocomplete="current-password">
+                    <div class="input-group" style="margin-bottom: 15px; position: relative;">
+                        <label for="auth-password"><i class="fa-solid fa-key"></i> Password</label>
+                        <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                            <input type="password" id="auth-password" placeholder="Enter your password..." autocomplete="current-password" style="width: 100%; padding-right: 35px;">
+                            <i id="password-status-icon" class="" style="position: absolute; right: 12px; display: none;"></i>
+                        </div>
                     </div>
 
                     <div class="auth-mode-toggle" style="text-align: right; margin-bottom: 20px;">
@@ -177,12 +184,12 @@
                     <div id="auth-fallback-section" style="display: none;">
                         <div class="panel-header" style="text-align: center; margin-bottom: 15px;">
                             <h3 style="color: var(--neon-red); font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-triangle-exclamation"></i> 2FA Fallback Verification</h3>
-                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">Biometric verification failed. Please enter your backup password and the verification code sent to your email.</p>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">Biometric verification failed. Please enter your password and the verification code sent to your email.</p>
                         </div>
                         
                         <div class="input-group" style="margin-bottom: 15px;">
-                            <label for="auth-fallback-password"><i class="fa-solid fa-key"></i> Backup Password</label>
-                            <input type="password" id="auth-fallback-password" placeholder="Enter your backup password...">
+                            <label for="auth-fallback-password"><i class="fa-solid fa-key"></i> Password</label>
+                            <input type="password" id="auth-fallback-password" placeholder="Enter your password...">
                         </div>
 
                         <div class="input-group" style="margin-bottom: 20px;">

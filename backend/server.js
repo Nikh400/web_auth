@@ -214,7 +214,7 @@ app.post('/api/authenticate', async (req, res) => {
     const { username, password, keystrokes, phrase } = req.body;
 
     if (!username || !password) {
-        return res.status(400).json({ error: "Username and backup password are required." });
+        return res.status(400).json({ error: "Username and password are required." });
     }
 
     try {
@@ -224,10 +224,10 @@ app.post('/api/authenticate', async (req, res) => {
             return res.status(404).json({ error: `No registered profile found for user "${username}".` });
         }
 
-        // 1. Verify backup password first
+        // 1. Verify password first
         const passwordCheck = await dbManager.authenticatePassword(user.username, password);
         if (!passwordCheck) {
-            return res.status(401).json({ error: "Invalid backup password." });
+            return res.status(401).json({ error: "Invalid password." });
         }
 
         const usernameClean = user.username.toLowerCase();
@@ -329,12 +329,30 @@ app.post('/api/authenticate', async (req, res) => {
     }
 });
 
-// POST authenticate user via backup password (now always triggers 2FA OTP)
+// POST verify user password (for live status indicators/success markers in the UI)
+app.post('/api/verify-password', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required." });
+    }
+    try {
+        const user = await dbManager.getUserByUsernameOrEmail(username);
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+        const passwordCheck = await dbManager.authenticatePassword(user.username, password);
+        return res.json({ success: !!passwordCheck });
+    } catch (err) {
+        res.status(500).json({ error: "Password check failed: " + err.message });
+    }
+});
+
+// POST authenticate user via password (now always triggers 2FA OTP)
 app.post('/api/authenticate-password', async (req, res) => {
     const { usernameOrEmail, password } = req.body;
 
     if (!usernameOrEmail || !password) {
-        return res.status(400).json({ error: "Username/email and backup password are required." });
+        return res.status(400).json({ error: "Username/email and password are required." });
     }
 
     try {
@@ -345,7 +363,7 @@ app.post('/api/authenticate-password', async (req, res) => {
 
         const passwordCheck = await dbManager.authenticatePassword(user.username, password);
         if (!passwordCheck) {
-            return res.status(401).json({ error: "Invalid backup password." });
+            return res.status(401).json({ error: "Invalid password." });
         }
 
         const usernameClean = user.username.toLowerCase();
@@ -365,12 +383,12 @@ app.post('/api/authenticate-password', async (req, res) => {
     }
 });
 
-// POST authenticate user via backup password + OTP fallback (2FA)
+// POST authenticate user via password + OTP fallback (2FA)
 app.post('/api/authenticate-fallback', async (req, res) => {
     const { username, password, otp } = req.body;
 
     if (!username || !password || !otp) {
-        return res.status(400).json({ error: "Username, backup password, and 2FA verification code are required." });
+        return res.status(400).json({ error: "Username, password, and 2FA verification code are required." });
     }
 
     try {
@@ -379,10 +397,10 @@ app.post('/api/authenticate-fallback', async (req, res) => {
             return res.status(404).json({ error: "User account not found." });
         }
 
-        // 1. Verify backup password
+        // 1. Verify password
         const passwordCheck = await dbManager.authenticatePassword(user.username, password);
         if (!passwordCheck) {
-            return res.status(401).json({ error: "Invalid backup password." });
+            return res.status(401).json({ error: "Invalid password." });
         }
 
         // 2. Verify OTP

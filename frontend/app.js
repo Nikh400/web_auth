@@ -113,8 +113,7 @@ function switchTab(tab) {
         updateAuthInputState();
     }
 }
-
-// Lock/Unlock biometric auth input based on Username and Backup Password
+// Lock/Unlock biometric auth input based on Username and Password
 function updateAuthInputState() {
     const username = authUsernameInput.value.trim();
     const password = authPasswordInput.value;
@@ -122,15 +121,108 @@ function updateAuthInputState() {
     authInput.disabled = disabled;
 
     if (disabled) {
-        authStatus.textContent = "Enter your username/email and backup password above to unlock.";
+        authStatus.textContent = "Enter your username/email and password above to unlock.";
         resetAuthentication();
     } else {
         authStatus.textContent = "Ready. Type target phrase to authenticate.";
     }
 }
 
-authUsernameInput.addEventListener("input", updateAuthInputState);
-authPasswordInput.addEventListener("input", updateAuthInputState);
+let passwordVerifyTimeout = null;
+
+async function verifyPasswordOnInput() {
+    const username = authUsernameInput.value.trim();
+    const password = authPasswordInput.value;
+    const markerIcon = document.getElementById("password-status-icon");
+
+    if (passwordVerifyTimeout) {
+        clearTimeout(passwordVerifyTimeout);
+    }
+
+    if (!username || username.length < 3 || !password) {
+        markerIcon.style.display = "none";
+        markerIcon.className = "";
+        return;
+    }
+
+    passwordVerifyTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch("/api/verify-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    markerIcon.style.display = "block";
+                    markerIcon.className = "fa-solid fa-circle-check";
+                    markerIcon.style.color = "var(--neon-green)";
+                } else {
+                    markerIcon.style.display = "block";
+                    markerIcon.className = "fa-solid fa-circle-xmark";
+                    markerIcon.style.color = "var(--neon-red)";
+                }
+            } else {
+                markerIcon.style.display = "none";
+            }
+        } catch (e) {
+            console.error("Error verifying password:", e);
+            markerIcon.style.display = "none";
+        }
+    }, 500);
+}
+
+async function triggerImmediatePasswordVerify() {
+    const username = authUsernameInput.value.trim();
+    const password = authPasswordInput.value;
+    const markerIcon = document.getElementById("password-status-icon");
+
+    if (passwordVerifyTimeout) {
+        clearTimeout(passwordVerifyTimeout);
+    }
+
+    if (!username || username.length < 3 || !password) {
+        markerIcon.style.display = "none";
+        markerIcon.className = "";
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/verify-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+                markerIcon.style.display = "block";
+                markerIcon.className = "fa-solid fa-circle-check";
+                markerIcon.style.color = "var(--neon-green)";
+            } else {
+                markerIcon.style.display = "block";
+                markerIcon.className = "fa-solid fa-circle-xmark";
+                markerIcon.style.color = "var(--neon-red)";
+            }
+        } else {
+            markerIcon.style.display = "none";
+        }
+    } catch (e) {
+        console.error("Error verifying password:", e);
+        markerIcon.style.display = "none";
+    }
+}
+
+authUsernameInput.addEventListener("input", () => {
+    updateAuthInputState();
+    verifyPasswordOnInput();
+});
+authPasswordInput.addEventListener("input", () => {
+    updateAuthInputState();
+    verifyPasswordOnInput();
+});
+authPasswordInput.addEventListener("blur", triggerImmediatePasswordVerify);
 
 // Fallback helper in case keyup was lost or delayed
 function recordPreviousKeyIfUnfinished() {
@@ -335,6 +427,7 @@ async function submitRegistration() {
                 document.getElementById("reg-email").value = "";
                 document.getElementById("reg-username").value = "";
                 document.getElementById("reg-password").value = "";
+                document.getElementById("reg-confirm-password").value = "";
                 resetRegistration();
                 
                 regEnrollmentSection.style.display = "none";
@@ -553,6 +646,7 @@ async function startBiometricEnrollment() {
     regEmail = document.getElementById("reg-email").value.trim();
     regUsername = document.getElementById("reg-username").value.trim();
     regPassword = document.getElementById("reg-password").value;
+    const regConfirmPassword = document.getElementById("reg-confirm-password").value;
 
     if (!regName || regName.length < 3) {
         showToast("Full Name must be at least 3 characters long.", "error");
@@ -571,7 +665,12 @@ async function startBiometricEnrollment() {
     }
 
     if (!regPassword || regPassword.length < 6) {
-        showToast("Backup Password must be at least 6 characters long.", "error");
+        showToast("Password must be at least 6 characters long.", "error");
+        return;
+    }
+
+    if (regPassword !== regConfirmPassword) {
+        showToast("Passwords do not match.", "error");
         return;
     }
 
@@ -676,7 +775,7 @@ async function skipTo2FA(event) {
     }
 
     if (!password) {
-        showToast("Please enter your backup password.", "error");
+        showToast("Please enter your password.", "error");
         return;
     }
 
@@ -726,14 +825,14 @@ async function skipTo2FA(event) {
     }
 }
 
-// Submit backup password + OTP fallback (2FA) credentials
+// Submit password + OTP fallback (2FA) credentials
 async function submitFallbackAuth() {
     const username = authUsernameInput.value.trim();
     const password = authFallbackPasswordInput.value;
     const otp = authFallbackOtpInput.value.trim();
 
     if (!password) {
-        showToast("Please enter your backup password.", "error");
+        showToast("Please enter your password.", "error");
         return;
     }
 
