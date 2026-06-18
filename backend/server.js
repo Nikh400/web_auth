@@ -209,12 +209,12 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// POST authenticate user via biometrics
+// POST authenticate user via password + optional biometrics (target phrase)
 app.post('/api/authenticate', async (req, res) => {
-    const { username, keystrokes, phrase } = req.body;
+    const { username, password, keystrokes, phrase } = req.body;
 
-    if (!username || !keystrokes || !Array.isArray(keystrokes)) {
-        return res.status(400).json({ error: "Username and keystroke recording are required." });
+    if (!username || !password) {
+        return res.status(400).json({ error: "Username and backup password are required." });
     }
 
     try {
@@ -224,8 +224,44 @@ app.post('/api/authenticate', async (req, res) => {
             return res.status(404).json({ error: `No registered profile found for user "${username}".` });
         }
 
+        // 1. Verify backup password first
+        const passwordCheck = await dbManager.authenticatePassword(user.username, password);
+        if (!passwordCheck) {
+            return res.status(401).json({ error: "Invalid backup password." });
+        }
+
+        const usernameClean = user.username.toLowerCase();
+        const { password_hash, password_salt, ...safeUser } = user;
+
+        // 2. Check if target phrase (keystrokes) is passed
+        const hasKeystrokes = keystrokes && Array.isArray(keystrokes) && keystrokes.length > 0;
+
+        if (!hasKeystrokes) {
+            // Target phrase not passed -> Send OTP for 2FA verification
+            console.log(`[SERVER] Target phrase not passed for ${user.username}. Triggering 2FA OTP.`);
+            const code = generateOTP();
+            await dbManager.saveOTP(usernameClean, code, Date.now() + 5 * 60 * 1000);
+            await sendOTP(user.email, "Two-Factor Verification Required", code);
+
+            return res.json({
+                success: false,
+                fallbackRequired: true,
+                message: "Password verified. Verification code sent to your registered email."
+            });
+        }
+
         if (!user.biometric_profile) {
-            return res.status(400).json({ error: `User "${username}" does not have a biometric profile registered.` });
+            // No biometric profile -> Fallback to 2FA OTP
+            console.log(`[SERVER] User "${user.username}" has no biometric profile. Triggering 2FA OTP.`);
+            const code = generateOTP();
+            await dbManager.saveOTP(usernameClean, code, Date.now() + 5 * 60 * 1000);
+            await sendOTP(user.email, "Two-Factor Verification Required", code);
+
+            return res.json({
+                success: false,
+                fallbackRequired: true,
+                message: "Password verified. Verification code sent to your registered email."
+            });
         }
 
         // Validate typed phrase matches expected phrase
@@ -238,10 +274,6 @@ app.post('/api/authenticate', async (req, res) => {
         }
 
         const verification = verifyAttempt(user.biometric_profile, keystrokes);
-        
-        const { password_hash, password_salt, ...safeUser } = user;
-
-        const usernameClean = user.username.toLowerCase();
 
         if (verification.authenticated) {
             console.log(`[SERVER] Biometric auth successful for: ${user.username} (Score: ${verification.score}%)`);
@@ -297,7 +329,7 @@ app.post('/api/authenticate', async (req, res) => {
     }
 });
 
-// POST authenticate user via backup password
+// POST authenticate user via backup password (now always triggers 2FA OTP)
 app.post('/api/authenticate-password', async (req, res) => {
     const { usernameOrEmail, password } = req.body;
 
@@ -306,21 +338,26 @@ app.post('/api/authenticate-password', async (req, res) => {
     }
 
     try {
-        const user = await dbManager.authenticatePassword(usernameOrEmail, password);
+        const user = await dbManager.getUserByUsernameOrEmail(usernameOrEmail);
         if (!user) {
-            return res.status(401).json({ error: "Invalid credentials or backup password." });
+            return res.status(404).json({ error: `No registered profile found for user "${usernameOrEmail}".` });
         }
 
-        // Generate dynamic token
-        const token = crypto.createHmac('sha256', 'kinetic-secret-key')
-                            .update(JSON.stringify({ username: user.username, timestamp: Date.now() }))
-                            .digest('hex');
+        const passwordCheck = await dbManager.authenticatePassword(user.username, password);
+        if (!passwordCheck) {
+            return res.status(401).json({ error: "Invalid backup password." });
+        }
 
-        console.log(`[SERVER] Password authentication successful for user: ${user.username}`);
+        const usernameClean = user.username.toLowerCase();
+        const code = generateOTP();
+        await dbManager.saveOTP(usernameClean, code, Date.now() + 5 * 60 * 1000);
+        await sendOTP(user.email, "Two-Factor Verification Required", code);
+
+        console.log(`[SERVER] Password authenticated, sending OTP for user: ${user.username}`);
         res.json({
-            success: true,
-            token: token,
-            user: user
+            success: false,
+            fallbackRequired: true,
+            message: "Password verified. Verification code sent to your registered email."
         });
     } catch (err) {
         console.error("Password authentication error:", err);

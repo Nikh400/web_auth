@@ -37,7 +37,6 @@ const regEnrollmentSection = document.getElementById("reg-enrollment-section");
 
 // Auth Sections
 const authBiometricSection = document.getElementById("auth-biometric-section");
-const authPasswordSection = document.getElementById("auth-password-section");
 const authFallbackSection = document.getElementById("auth-fallback-section");
 const authFallbackPasswordInput = document.getElementById("auth-fallback-password");
 const authFallbackOtpInput = document.getElementById("auth-fallback-otp");
@@ -108,33 +107,30 @@ function switchTab(tab) {
     } else {
         authFallbackSection.style.display = "none";
         toggleAuthModeLink.style.display = "inline-flex";
-        if (authMode === "biometric") {
-            authBiometricSection.style.display = "block";
-            authPasswordSection.style.display = "none";
-        } else {
-            authBiometricSection.style.display = "none";
-            authPasswordSection.style.display = "block";
-        }
+        authBiometricSection.style.display = "block";
         authUsernameInput.focus();
         loadAuthenticationPhrase();
+        updateAuthInputState();
     }
 }
 
-// Lock/Unlock biometric auth input based on Username
-authUsernameInput.addEventListener("input", (e) => {
-    const val = e.target.value.trim();
-    const disabled = val.length < 3;
+// Lock/Unlock biometric auth input based on Username and Backup Password
+function updateAuthInputState() {
+    const username = authUsernameInput.value.trim();
+    const password = authPasswordInput.value;
+    const disabled = username.length < 3 || password.length < 1;
     authInput.disabled = disabled;
 
     if (disabled) {
-        authStatus.textContent = "Enter your username/email above to unlock.";
+        authStatus.textContent = "Enter your username/email and backup password above to unlock.";
         resetAuthentication();
     } else {
-        if (authMode === "biometric") {
-            authStatus.textContent = "Ready. Type target phrase to authenticate.";
-        }
+        authStatus.textContent = "Ready. Type target phrase to authenticate.";
     }
-});
+}
+
+authUsernameInput.addEventListener("input", updateAuthInputState);
+authPasswordInput.addEventListener("input", updateAuthInputState);
 
 // Fallback helper in case keyup was lost or delayed
 function recordPreviousKeyIfUnfinished() {
@@ -378,7 +374,7 @@ function handleLoginSuccess(user, token) {
                 redirectStr = "https://" + redirectStr;
             }
             const baseUrl = redirectStr.startsWith("/") ? window.location.origin : undefined;
-            const redirectUrl = new URL(redirectStr, baseUrl);
+            const redirectUrl = baseUrl ? new URL(redirectStr, baseUrl) : new URL(redirectStr);
 
             redirectUrl.searchParams.set("status", "success");
             redirectUrl.searchParams.set("username", user.username);
@@ -410,7 +406,7 @@ function handleLoginSuccess(user, token) {
 
 // Process Authentication Attempt
 async function processAuthenticationAttempt(inputElement) {
-    authStatus.textContent = "Verifying biometric signature...";
+    authStatus.textContent = "Verifying credentials and biometric signature...";
     const currentUsername = authUsernameInput.value.trim();
     
     try {
@@ -419,6 +415,7 @@ async function processAuthenticationAttempt(inputElement) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 username: currentUsername,
+                password: authPasswordInput.value,
                 keystrokes: currentKeystrokes,
                 phrase: targetPhrase
             })
@@ -441,18 +438,17 @@ async function processAuthenticationAttempt(inputElement) {
                 lockVisual.style.animation = "shake 0.4s ease";
                 setTimeout(() => lockVisual.style.animation = "", 400);
 
-                authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Rhythm Mismatch!</span> 2FA verification required.`;
+                authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Biometric Mismatch!</span> 2FA verification required.`;
                 showToast("Biometric mismatch. Verification code sent to email.", "warning");
 
                 // Transition UI to 2FA fallback inputs
                 authBiometricSection.style.display = "none";
-                authPasswordSection.style.display = "none";
                 toggleAuthModeLink.style.display = "none";
 
                 authFallbackSection.style.display = "block";
-                authFallbackPasswordInput.value = "";
+                authFallbackPasswordInput.value = authPasswordInput.value;
                 authFallbackOtpInput.value = "";
-                setTimeout(() => authFallbackPasswordInput.focus(), 150);
+                setTimeout(() => authFallbackOtpInput.focus(), 150);
             } else {
                 lockVisual.classList.add("locked");
                 lockVisual.style.animation = "shake 0.4s ease";
@@ -668,37 +664,13 @@ function backToRegistrationForm() {
     regFormSection.style.display = "block";
 }
 
-function toggleAuthMode(event) {
+// Skip biometric verification and trigger Email OTP 2FA flow directly
+async function skipTo2FA(event) {
     if (event) event.preventDefault();
-
-    if (authMode === "biometric") {
-        authMode = "password";
-        authBiometricSection.style.display = "none";
-        authPasswordSection.style.display = "block";
-        toggleAuthModeLink.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Use Biometric Verification instead`;
-        authPasswordInput.focus();
-    } else {
-        authMode = "biometric";
-        authPasswordSection.style.display = "none";
-        authBiometricSection.style.display = "block";
-        toggleAuthModeLink.innerHTML = `<i class="fa-solid fa-key"></i> Use Backup Password instead`;
-        
-        if (authUsernameInput.value.trim().length >= 3) {
-            authInput.disabled = false;
-            authStatus.textContent = "Ready. Type target phrase to authenticate.";
-            authInput.focus();
-        } else {
-            authInput.disabled = true;
-            authStatus.textContent = "Enter your username/email above to unlock.";
-        }
-    }
-}
-
-async function submitPasswordAuth() {
-    const usernameOrEmail = authUsernameInput.value.trim();
+    const username = authUsernameInput.value.trim();
     const password = authPasswordInput.value;
 
-    if (!usernameOrEmail || usernameOrEmail.length < 3) {
+    if (!username || username.length < 3) {
         showToast("Please enter your username or email.", "error");
         return;
     }
@@ -708,32 +680,48 @@ async function submitPasswordAuth() {
         return;
     }
 
-    authStatus.textContent = "Verifying password...";
+    authStatus.textContent = "Verifying password & sending 2FA code...";
 
     try {
-        const res = await fetch("/api/authenticate-password", {
+        const res = await fetch("/api/authenticate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ usernameOrEmail, password })
+            body: JSON.stringify({
+                username: username,
+                password: password,
+                keystrokes: null,
+                phrase: null
+            })
         });
 
         const data = await res.json();
 
-        if (res.ok && data.success) {
-            lockVisual.className = "lock-visual unlocked";
-            lockIcon.className = "fa-solid fa-lock-open";
-            lockLabel.textContent = "UNLOCKED";
-            
-            showToast("Password verified successfully!", "success");
-            
-            handleLoginSuccess(data.user, data.token);
+        if (res.ok) {
+            if (data.fallbackRequired) {
+                authStatus.innerHTML = `<span style="color: var(--accent-cyan); font-weight: bold;">Password Verified!</span> 2FA verification required.`;
+                showToast("Verification code sent to email.", "warning");
+
+                // Transition UI to 2FA fallback inputs
+                authBiometricSection.style.display = "none";
+                toggleAuthModeLink.style.display = "none";
+
+                authFallbackSection.style.display = "block";
+                authFallbackPasswordInput.value = password;
+                authFallbackOtpInput.value = "";
+                setTimeout(() => authFallbackOtpInput.focus(), 150);
+            } else if (data.success) {
+                handleLoginSuccess(data.user, data.token);
+            } else {
+                showToast(data.message || "Failed to trigger 2FA.", "error");
+                authStatus.textContent = data.message || "Failed to trigger 2FA.";
+            }
         } else {
-            showToast(data.error || "Password verification failed.", "error");
-            authStatus.textContent = data.error || "Password verification failed.";
+            showToast(data.error || "Authentication failed.", "error");
+            authStatus.textContent = data.error || "Authentication failed.";
         }
     } catch (e) {
-        console.error("Password authentication network error:", e);
-        showToast("Server network error during password authentication.", "error");
+        console.error("Skip to 2FA error:", e);
+        showToast("Server network error during authentication.", "error");
         authStatus.textContent = "Network error.";
     }
 }
@@ -787,15 +775,15 @@ async function submitFallbackAuth() {
 function cancelFallbackAuth() {
     authFallbackSection.style.display = "none";
     toggleAuthModeLink.style.display = "inline-flex";
-    
-    if (authMode === "biometric") {
-        authBiometricSection.style.display = "block";
-        authStatus.textContent = "Ready. Type target phrase to authenticate.";
-        setTimeout(() => authInput.focus(), 150);
-    } else {
-        authPasswordSection.style.display = "block";
-        setTimeout(() => authPasswordInput.focus(), 150);
-    }
+    authBiometricSection.style.display = "block";
+    updateAuthInputState();
+    setTimeout(() => {
+        if (!authInput.disabled) {
+            authInput.focus();
+        } else {
+            authPasswordInput.focus();
+        }
+    }, 150);
 }
 
 // Init config fetch on page load
