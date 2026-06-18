@@ -82,6 +82,28 @@ async function loadAuthenticationPhrase() {
     }
 }
 
+// Fetch a random registration phrase to rotate on mistake
+async function rotateRegistrationPhrase() {
+    try {
+        const res = await fetch("/api/phrases?count=1");
+        if (res.ok) {
+            const data = await res.json();
+            const newPhrase = data.phrases[0];
+            const currentAttemptIdx = regAttempts.length;
+            if (currentAttemptIdx < registrationPhrases.length) {
+                registrationPhrases[currentAttemptIdx] = newPhrase;
+            } else {
+                registrationPhrases.push(newPhrase);
+            }
+            targetPhrase = newPhrase;
+            document.getElementById("reg-target-phrase").textContent = targetPhrase;
+            resetTyping(regInput);
+        }
+    } catch (e) {
+        console.error("Failed to rotate registration phrase:", e);
+    }
+}
+
 // Tab switcher
 function switchTab(tab) {
     if (tab === currentTab) return;
@@ -408,15 +430,27 @@ function handleKeyUp(event, inputElement, isReg) {
         updateChartBars(currentKeystrokes);
 
         // Check completion
-        if (inputElement.value.toLowerCase() === targetPhrase) {
-            // Small timeout to allow input rendering
-            setTimeout(() => {
-                if (isReg) {
-                    processRegistrationTrial(inputElement);
-                } else {
-                    processAuthenticationAttempt(inputElement);
-                }
-            }, 150);
+        if (inputElement.value.length >= targetPhrase.length) {
+            if (inputElement.value.toLowerCase() === targetPhrase) {
+                // Small timeout to allow input rendering
+                setTimeout(() => {
+                    if (isReg) {
+                        processRegistrationTrial(inputElement);
+                    } else {
+                        processAuthenticationAttempt(inputElement);
+                    }
+                }, 150);
+            } else {
+                // Mismatch / typo detected! Rotate phrase
+                setTimeout(() => {
+                    showToast("Phrase mismatch! Rotating target phrase.", "error");
+                    if (isReg) {
+                        rotateRegistrationPhrase();
+                    } else {
+                        loadAuthenticationPhrase();
+                    }
+                }, 150);
+            }
         }
     }
 }
