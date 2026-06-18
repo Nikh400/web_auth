@@ -1,17 +1,24 @@
-const TARGET_PHRASE = "secure typing";
+const TARGET_PHRASE = "secure";
 
 // Pool of versatile phrases for registration and authentication
 const PHRASE_POOL = [
-    "secure dynamic authentication pattern",
-    "biometric keystroke rhythm detection",
-    "identity protection defense system",
-    "behavioral analysis verification protocol",
-    "advanced pattern typing defense",
-    "network security baseline monitor",
-    "machine learning profile classification",
-    "reliable credential match confirmation",
-    "encrypted keystroke telemetry record",
-    "continuous user verification flow"
+    "secure",
+    "pattern",
+    "defense",
+    "identity",
+    "dynamic",
+    "rhythm",
+    "typing",
+    "protect",
+    "keystroke",
+    "biometric",
+    "advanced",
+    "monitor",
+    "profile",
+    "credential",
+    "encrypted",
+    "telemetry",
+    "continuous"
 ];
 
 

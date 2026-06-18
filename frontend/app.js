@@ -737,9 +737,9 @@ async function submitRegistrationOTP() {
             registrationPhrases = phraseData.phrases;
         } else {
             registrationPhrases = [
-                "secure dynamic authentication pattern",
-                "biometric keystroke rhythm detection",
-                "identity protection defense system"
+                "secure",
+                "pattern",
+                "defense"
             ];
         }
 
