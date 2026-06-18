@@ -549,6 +549,9 @@ async function processAuthenticationAttempt(inputElement) {
 
                 authStatus.innerHTML = `<span style="color: var(--neon-red); font-weight: bold;">Rhythm Mismatch!</span> ${data.message || "Match Confidence: " + data.score + "%"}`;
                 showToast(data.message || `Verification failed (${data.score}% similarity).`, "error");
+                
+                // Change the phrase on failure so they try a different one
+                loadAuthenticationPhrase();
             }
         } else {
             showToast(data.error || "Authentication failed.", "error");
@@ -734,9 +737,9 @@ async function submitRegistrationOTP() {
             registrationPhrases = phraseData.phrases;
         } else {
             registrationPhrases = [
-                "secure",
-                "pattern",
-                "defense"
+                "secure dynamic authentication pattern",
+                "biometric keystroke rhythm detection",
+                "identity protection defense system"
             ];
         }
 
